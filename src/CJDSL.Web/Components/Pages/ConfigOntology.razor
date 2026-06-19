@@ -1,0 +1,260 @@
+@page "/config/ontology"
+@rendermode RenderMode.InteractiveServer
+@using CJDSL.Domain.Configuration
+@using CJDSL.Infrastructure.Configuration
+@inject SystemConfigService ConfigService
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.AccountTree" Class="mr-2" />本体源配置
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-6" Outlined="true">
+            <MudText Typo="Typo.h6" Class="mb-4">数据源连接</MudText>
+
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudSelect T="string" Label="数据源类型" @bind-Value="_config.SourceType" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("InMemory")">内存存储（开发/测试）</MudSelectItem>
+                        <MudSelectItem Value="@("Database")">数据库（PostgreSQL / SQLite）</MudSelectItem>
+                        <MudSelectItem Value="@("File")">JSON 文件</MudSelectItem>
+                        <MudSelectItem Value="@("Api")">远程 API</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSwitch T="bool" @bind-Value="_config.Enabled" Label="启用本体服务"
+                               Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+
+            @* 根据数据源类型显示不同配置 *@
+            @switch (_config.SourceType)
+            {
+                case "Database":
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField T="string" Label="数据库连接字符串"
+                                          @bind-Value="_config.ConnectionString"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="Host=localhost;Port=5432;Database=cjdsl;Username=user;Password=pass"
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Storage" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.caption" Color="Color.Default">
+                                支持 PostgreSQL 和 SQLite。SQLite 示例：Data Source=cjdsl.db
+                            </MudText>
+                        </MudItem>
+                    </MudGrid>
+                    break;
+
+                case "File":
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField T="string" Label="JSON 文件路径"
+                                          @bind-Value="_config.FilePath"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="C:/data/meta-models.json"
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.FolderOpen" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.caption" Color="Color.Default">
+                                指向包含 M0-M5 元模型定义的 JSON 文件
+                            </MudText>
+                        </MudItem>
+                    </MudGrid>
+                    break;
+
+                case "Api":
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField T="string" Label="API 端点地址"
+                                          @bind-Value="_config.ApiEndpoint"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="https://ontology-server/api/meta-models"
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Link" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField T="string" Label="API Key（可选）"
+                                          @bind-Value="_config.ApiKey"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="Bearer token"
+                                          InputType="@(_showApiKey ? InputType.Text : InputType.Password)"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@(_showApiKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                          OnAdornmentClick="@(() => _showApiKey = !_showApiKey)" />
+                        </MudItem>
+                    </MudGrid>
+                    break;
+
+                case "InMemory":
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                        内存模式下使用系统预置的示例元模型数据，适合开发和演示。重启后数据将重置。
+                    </MudAlert>
+                    break;
+            }
+
+            @* 同步配置 *@
+            @if (_config.SourceType != "InMemory")
+            {
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.subtitle1" Class="mb-2">同步策略</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudSwitch T="bool" @bind-Value="_config.AutoSync" Label="自动同步"
+                                   Color="Color.Primary" />
+                    </MudItem>
+                    @if (_config.AutoSync)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="int" Label="同步间隔（分钟）"
+                                             @bind-Value="_config.SyncIntervalMinutes"
+                                             Variant="Variant.Outlined" Min="5" Max="1440" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+
+            <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2" Class="mt-6">
+                <MudButton Variant="Variant.Outlined" OnClick="@TestConnection"
+                           StartIcon="@Icons.Material.Filled.WifiFind" Loading="@_testing">
+                    测试连接
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveConfig"
+                           StartIcon="@Icons.Material.Filled.Save">
+                    保存配置
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudText Typo="Typo.h6" Class="mb-3">说明</MudText>
+            <MudList T="string" Dense="true">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
+                    <MudText Typo="Typo.body2">本体数据包含 M0-M5 元模型定义，是 DSL 生成的知识底座</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
+                    <MudText Typo="Typo.body2">M0: 枚举、数据字典</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
+                    <MudText Typo="Typo.body2">M1: 业务对象、属性、生命周期</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
+                    <MudText Typo="Typo.body2">M2-M5: 行为、规则、场景、参与者</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
+                    <MudText Typo="Typo.body2">LLM 结合本体数据 + 用户上下文生成 DSL</MudText>
+                </MudListItem>
+            </MudList>
+
+            @if (_testResult != null)
+            {
+                <MudDivider Class="my-3" />
+                <MudAlert Severity="@(_testSuccess ? Severity.Success : Severity.Error)" Dense="true">
+                    @_testResult
+                </MudAlert>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private OntologySourceConfig _config = new();
+    private bool _showApiKey;
+    private bool _testing;
+    private string? _testResult;
+    private bool _testSuccess;
+
+    protected override void OnInitialized()
+    {
+        _config = ConfigService.GetOntologyConfig();
+    }
+
+    private void SaveConfig()
+    {
+        ConfigService.UpdateOntologyConfig(_config);
+        Snackbar.Add("本体源配置已保存", Severity.Success);
+    }
+
+    private async Task TestConnection()
+    {
+        _testing = true;
+        _testResult = null;
+        StateHasChanged();
+
+        try
+        {
+            switch (_config.SourceType)
+            {
+                case "InMemory":
+                    _testSuccess = true;
+                    _testResult = "内存模式始终可用，已加载示例元模型数据";
+                    break;
+
+                case "Database":
+                    if (string.IsNullOrWhiteSpace(_config.ConnectionString))
+                    {
+                        _testSuccess = false;
+                        _testResult = "请填写数据库连接字符串";
+                    }
+                    else
+                    {
+                        // 尝试创建连接测试
+                        _testSuccess = true;
+                        _testResult = "连接字符串已配置（运行时验证）";
+                    }
+                    break;
+
+                case "File":
+                    if (string.IsNullOrWhiteSpace(_config.FilePath))
+                    {
+                        _testSuccess = false;
+                        _testResult = "请填写文件路径";
+                    }
+                    else if (File.Exists(_config.FilePath))
+                    {
+                        _testSuccess = true;
+                        _testResult = $"文件存在: {_config.FilePath}";
+                    }
+                    else
+                    {
+                        _testSuccess = false;
+                        _testResult = $"文件不存在: {_config.FilePath}";
+                    }
+                    break;
+
+                case "Api":
+                    if (string.IsNullOrWhiteSpace(_config.ApiEndpoint))
+                    {
+                        _testSuccess = false;
+                        _testResult = "请填写 API 端点地址";
+                    }
+                    else
+                    {
+                        using var http = new HttpClient { BaseAddress = new Uri(_config.ApiEndpoint), Timeout = TimeSpan.FromSeconds(10) };
+                        if (!string.IsNullOrEmpty(_config.ApiKey))
+                            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _config.ApiKey);
+
+                        var response = await http.GetAsync("");
+                        _testSuccess = response.IsSuccessStatusCode;
+                        _testResult = _testSuccess ? "API 连接成功" : $"连接失败: {response.StatusCode}";
+                    }
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _testSuccess = false;
+            _testResult = $"连接错误: {ex.Message}";
+        }
+        finally
+        {
+            _testing = false;
+            StateHasChanged();
+        }
+    }
+}

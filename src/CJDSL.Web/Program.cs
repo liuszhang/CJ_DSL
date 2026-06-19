@@ -2,6 +2,8 @@ using CJDSL.Api;
 using CJDSL.Api.Endpoints;
 using CJDSL.Infrastructure;
 using CJDSL.Web.Components;
+using CJDSL.Web.Services;
+using Microsoft.AspNetCore.Components;
 using MudBlazor.Services;
 
 namespace CJDSL.Web;
@@ -19,10 +21,18 @@ public class Program
         builder.Services.AddMudServices();
 
         builder.Services.AddHttpClient();
+        builder.Services.AddScoped<HttpClient>(sp =>
+        {
+            var nav = sp.GetRequiredService<NavigationManager>();
+            return new HttpClient { BaseAddress = new Uri(nav.BaseUri) };
+        });
 
         // CJDSL 各层服务
         builder.Services.AddCJDSLApi();
         builder.Services.AddCJDSLInfrastructure();
+
+        // 浮窗管理服务
+        builder.Services.AddSingleton<FloatService>();
 
         var app = builder.Build();
 

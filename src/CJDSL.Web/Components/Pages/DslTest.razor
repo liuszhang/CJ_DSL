@@ -1,0 +1,226 @@
+@page "/dsl-test"
+@rendermode RenderMode.InteractiveServer
+@using CJDSL.Blazor.Models
+@using CJDSL.Blazor.Components.Renderers
+@inject ISnackbar Snackbar
+
+<style>
+    .dsl-test-left, .dsl-test-right {
+        height: calc(100vh - 140px);
+        display: flex;
+        flex-direction: column;
+    }
+    .dsl-test-textarea textarea {
+        flex: 1 !important;
+        min-height: 0 !important;
+        height: auto !important;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 13px;
+        resize: none;
+    }
+    .dsl-test-preview {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+</style>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Science" Class="mr-2" />DSL 测试
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="5">
+        <MudPaper Class="pa-4 dsl-test-left" Outlined="true">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                <MudText Typo="Typo.h6">DSL JSON</MudText>
+                <MudStack Row="true" Spacing="1">
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@LoadSampleDsl">
+                        加载示例
+                    </MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@ClearEditor">
+                        清空
+                    </MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@RenderDsl">
+                        渲染
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+
+            <div class="dsl-test-textarea" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <textarea @bind="_dslInput"
+                          @bind:event="oninput"
+                          placeholder="在此粘贴 DSL JSON..."
+                          style="flex: 1; width: 100%; border: 1px solid var(--mud-palette-lines-default); border-radius: 4px; padding: 12px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; line-height: 1.5; resize: none; outline: none; background: var(--mud-palette-surface); color: var(--mud-palette-text-primary);"
+                          @onkeyup="OnKeyUp"></textarea>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="7">
+        <MudPaper Class="pa-4 dsl-test-right" Outlined="true">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                <MudText Typo="Typo.h6">预览</MudText>
+                @if (_renderError != null)
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.Error">
+                        @_renderError
+                    </MudChip>
+                }
+            else if (_dslPage != null)
+            {
+                <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.CheckCircle">
+                    @(_dslPage!.Layout) 布局 · @(_dslPage!.Components.Count) 个组件
+                </MudChip>
+            }
+            </MudStack>
+
+            <div class="dsl-test-preview">
+                @if (_dslPage != null)
+                {
+                    <DslPageRenderer DslPage="@_dslPage" User="_user" />
+                }
+                else if (_renderError != null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="ma-2">@_renderError</MudAlert>
+                }
+                else
+                {
+                    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 100%;">
+                        <MudIcon Icon="@Icons.Material.Filled.Preview" Size="Size.Large" Color="Color.Default" />
+                        <MudText Typo="Typo.body1" Color="Color.Default">在左侧输入 DSL JSON 并点击渲染</MudText>
+                    </MudStack>
+                }
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string _dslInput = string.Empty;
+    private CJDSL.Blazor.Models.DslPage? _dslPage;
+    private string? _renderError;
+
+    private readonly UserContext _user = new()
+    {
+        UserId = "demo",
+        UserName = "演示用户",
+        Roles = ["operator", "admin"],
+        Permissions = ["repair:create", "repair:edit", "repair:view", "equipment:view"]
+    };
+
+    private void RenderDsl()
+    {
+        _renderError = null;
+        _dslPage = null;
+
+        if (string.IsNullOrWhiteSpace(_dslInput))
+        {
+            _renderError = "请输入 DSL JSON";
+            return;
+        }
+
+        try
+        {
+            _dslPage = System.Text.Json.JsonSerializer.Deserialize<CJDSL.Blazor.Models.DslPage>(_dslInput, new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (_dslPage == null)
+            {
+                _renderError = "解析结果为空";
+            }
+            else if (_dslPage.Components.Count == 0)
+            {
+                _renderError = "Components 为空，页面将不显示任何内容";
+            }
+        }
+        catch (Exception ex)
+        {
+            _renderError = $"JSON 解析失败: {ex.Message}";
+        }
+    }
+
+    private void ClearEditor()
+    {
+        _dslInput = string.Empty;
+        _dslPage = null;
+        _renderError = null;
+    }
+
+    private void OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.CtrlKey && e.Key == "Enter")
+        {
+            RenderDsl();
+        }
+    }
+
+    private void LoadSampleDsl()
+    {
+        _dslInput = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            id = "sample_form",
+            title = "设备报修单",
+            layout = "form",
+            components = new object[]
+            {
+                new
+                {
+                    type = "card",
+                    props = new { Elevation = 2 },
+                    children = new object[]
+                    {
+                        new { type = "textDisplay", label = "设备报修单", props = new { Typo = "h5" } },
+                        new
+                        {
+                            type = "form",
+                            id = "repairForm",
+                            children = new object[]
+                            {
+                                new
+                                {
+                                    type = "grid",
+                                    children = new object[]
+                                    {
+                                        new { type = "text", span = 6, label = "报修单号", fieldName = "repairNo", props = new { Required = true, ReadOnly = true, Variant = "Filled" } },
+                                        new { type = "text", span = 6, label = "设备名称", fieldName = "equipmentName", props = new { Required = true } },
+                                        new
+                                        {
+                                            type = "select", span = 6, label = "设备类型", fieldName = "equipmentType",
+                                            dataSource = new { type = "enum", code = "equipment_type" },
+                                            props = new { Required = true }
+                                        },
+                                        new { type = "date", span = 6, label = "报修日期", fieldName = "repairDate", props = new { Required = true } },
+                                        new
+                                        {
+                                            type = "select", span = 6, label = "优先级", fieldName = "priority",
+                                            dataSource = new { type = "enum", code = "priority" },
+                                            props = new { Required = true }
+                                        },
+                                        new { type = "textarea", span = 12, label = "故障描述", fieldName = "faultDescription", props = new { Required = true, Lines = 4, MaxLength = 500 } }
+                                    }
+                                },
+                                new { type = "divider", props = new { Class = "my-4" } },
+                                new
+                                {
+                                    type = "stack",
+                                    props = new { Row = true, Justify = "flex-end", Spacing = 2 },
+                                    children = new object[]
+                                    {
+                                        new { type = "button", label = "重置", props = new { Variant = "Outlined", Color = "Secondary" }, events = new[] { new { type = "onClick", handler = "reset", @params = new { formId = "repairForm" } } } },
+                                        new { type = "button", label = "保存", props = new { Variant = "Filled", Color = "Primary" }, events = new[] { new { type = "onClick", handler = "showToast", @params = new { message = "保存成功", severity = "success" } } } },
+                                        new { type = "button", label = "提交", props = new { Variant = "Filled", Color = "Tertiary" }, events = new[] { new { type = "onClick", handler = "showToast", @params = new { message = "提交成功", severity = "success" } } } }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+
+        RenderDsl();
+    }
+}

@@ -1,40 +1,393 @@
 @page "/"
 @rendermode RenderMode.InteractiveServer
+@inject IDialogService DialogService
 
 <MudText Typo="Typo.h3" Class="mb-4">欢迎使用 CJDSL</MudText>
 <MudText Typo="Typo.body1" Class="mb-4">
-    CJDSL 是一套新一代 DSL 驱动 Web 应用系统，基于 .NET 10 + Blazor + MudBlazor 构建。
+    CJDSL 是一套新一代 DSL 驱动 Web 应用系统，根据用户意图动态生成前端交互界面。数据+用户意图=界面。
 </MudText>
 
 <MudGrid>
-    <MudItem xs="12" md="6">
+    <MudItem xs="12">
         <MudCard Elevation="2" Class="pa-4">
             <MudCardHeader>
-                <MudText Typo="Typo.h6">核心特性</MudText>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.RocketLaunch" Class="mr-2" />快速体验
+                </MudText>
             </MudCardHeader>
             <MudCardContent>
-                <MudList T="string">
-                    <MudListItem>大模型实时生成 DSL 声明式界面</MudListItem>
-                    <MudListItem>统一渲染引擎映射到 MudBlazor 组件</MudListItem>
-                    <MudListItem>七维元模型驱动业务逻辑</MudListItem>
-                    <MudListItem>上下文感知：权限、设备、角色</MudListItem>
-                </MudList>
+                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.EditNote"
+                               OnClick="@(() => OpenDslPreview("repair-form"))">
+                        设备报修单
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary"
+                               StartIcon="@Icons.Material.Filled.List"
+                               OnClick="@(() => OpenDslPreview("equipment-list"))">
+                        设备列表
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Tertiary"
+                               StartIcon="@Icons.Material.Filled.PersonAdd"
+                               OnClick="@(() => OpenDslPreview("user-form"))">
+                        用户注册
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Info"
+                               StartIcon="@Icons.Material.Filled.Inventory"
+                               OnClick="@(() => OpenDslPreview("product-form"))">
+                        产品录入
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Assignment"
+                               OnClick="@(() => OpenDslPreview("task-board"))">
+                        任务看板
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                               StartIcon="@Icons.Material.Filled.Analytics"
+                               OnClick="@(() => OpenDslPreview("dashboard"))">
+                        数据仪表盘
+                    </MudButton>
+                </MudStack>
             </MudCardContent>
         </MudCard>
     </MudItem>
-    <MudItem xs="12" md="6">
+
+    <MudItem xs="12">
         <MudCard Elevation="2" Class="pa-4">
             <MudCardHeader>
-                <MudText Typo="Typo.h6">快速体验</MudText>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.EmojiObjects" Class="mr-2" />核心能力
+                </MudText>
             </MudCardHeader>
             <MudCardContent>
-                <MudButton Href="/dsl/repair-form" Variant="Variant.Filled" Color="Color.Primary" Class="mr-2">
-                    设备报修单
-                </MudButton>
-                <MudButton Href="/dsl/equipment-list" Variant="Variant.Outlined" Color="Color.Secondary">
-                    设备列表
-                </MudButton>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudStack AlignItems="AlignItems.Center" Class="pa-3">
+                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Large" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle2" Align="Align.Center">LLM 驱动</MudText>
+                            <MudText Typo="Typo.caption" Align="Align.Center">大模型实时生成 DSL 声明式界面</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudStack AlignItems="AlignItems.Center" Class="pa-3">
+                            <MudIcon Icon="@Icons.Material.Filled.CodeOff" Size="Size.Large" Color="Color.Secondary" />
+                            <MudText Typo="Typo.subtitle2" Align="Align.Center">零前端代码</MudText>
+                            <MudText Typo="Typo.caption" Align="Align.Center">无需手写 UI，LLM 生成 DSL</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudStack AlignItems="AlignItems.Center" Class="pa-3">
+                            <MudIcon Icon="@Icons.Material.Filled.UnfoldMore" Size="Size.Large" Color="Color.Tertiary" />
+                            <MudText Typo="Typo.subtitle2" Align="Align.Center">统一渲染引擎</MudText>
+                            <MudText Typo="Typo.caption" Align="Align.Center">一套引擎映射到 MudBlazor 组件</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudStack AlignItems="AlignItems.Center" Class="pa-3">
+                            <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" Color="Color.Info" />
+                            <MudText Typo="Typo.subtitle2" Align="Align.Center">元模型驱动</MudText>
+                            <MudText Typo="Typo.caption" Align="Align.Center">七维元模型驱动业务逻辑</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudStack AlignItems="AlignItems.Center" Class="pa-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Large" Color="Color.Warning" />
+                            <MudText Typo="Typo.subtitle2" Align="Align.Center">上下文感知</MudText>
+                            <MudText Typo="Typo.caption" Align="Align.Center">权限、设备、角色动态控制</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudStack AlignItems="AlignItems.Center" Class="pa-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Bolt" Size="Size.Large" Color="Color.Success" />
+                            <MudText Typo="Typo.subtitle2" Align="Align.Center">即时热更新</MudText>
+                            <MudText Typo="Typo.caption" Align="Align.Center">DSL 是数据，无需重新发版</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudStack AlignItems="AlignItems.Center" Class="pa-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Large" Color="Color.Secondary" />
+                            <MudText Typo="Typo.subtitle2" Align="Align.Center">千人千面</MudText>
+                            <MudText Typo="Typo.caption" Align="Align.Center">同一 DSL 适配不同用户角色</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudStack AlignItems="AlignItems.Center" Class="pa-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Large" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle2" Align="Align.Center">极速交付</MudText>
+                            <MudText Typo="Typo.caption" Align="Align.Center">减少 80%+ 前端开发工作量</MudText>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
             </MudCardContent>
         </MudCard>
     </MudItem>
 </MudGrid>
+
+@* ===== 系统实现原理 ===== *@
+<MudText Typo="Typo.h4" Class="mt-8 mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Schema" Class="mr-2" />系统实现原理
+</MudText>
+
+@* 流程一：DSL 生成流程 *@
+<MudPaper Elevation="2" Class="pa-6 mb-6">
+    <MudText Typo="Typo.h6" Class="mb-4" Color="Color.Primary">
+        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Class="mr-1" />DSL 生成流程
+    </MudText>
+
+    <MudGrid Spacing="3" Class="align-center">
+        @* Step 1 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-primary-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" Color="Color.Primary" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">元模型定义</MudText>
+                <MudText Typo="Typo.caption">M0-M5 业务实体</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="1" Class="d-flex justify-center">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Size="Size.Large" />
+        </MudItem>
+
+        @* Step 2 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-secondary-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">用户上下文</MudText>
+                <MudText Typo="Typo.caption">角色 · 权限 · 设备</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="1" Class="d-flex justify-center">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Size="Size.Large" />
+        </MudItem>
+
+        @* Step 3 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-tertiary-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Large" Color="Color.Tertiary" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">LLM 生成</MudText>
+                <MudText Typo="Typo.caption">Prompt + 推理</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="1" Class="d-flex justify-center">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Size="Size.Large" />
+        </MudItem>
+
+        @* Step 4 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-success-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.DataObject" Size="Size.Large" Color="Color.Success" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">DSL JSON</MudText>
+                <MudText Typo="Typo.caption">声明式界面描述</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudDivider Class="my-4" />
+
+    <MudStack Row="true" Spacing="4" Justify="Justify.Center">
+        <MudChip T="string" Icon="@Icons.Material.Filled.Info" Size="Size.Small" Variant="Variant.Outlined">
+            元模型提供业务知识
+        </MudChip>
+        <MudChip T="string" Icon="@Icons.Material.Filled.Info" Size="Size.Small" Variant="Variant.Outlined">
+            用户上下文决定权限与布局
+        </MudChip>
+        <MudChip T="string" Icon="@Icons.Material.Filled.Info" Size="Size.Small" Variant="Variant.Outlined">
+            LLM 结合两者生成 DSL
+        </MudChip>
+        <MudChip T="string" Icon="@Icons.Material.Filled.Info" Size="Size.Small" Variant="Variant.Outlined">
+            后处理注入验证规则与数据源
+        </MudChip>
+    </MudStack>
+</MudPaper>
+
+@* 流程二：渲染流程 *@
+<MudPaper Elevation="2" Class="pa-6 mb-6">
+    <MudText Typo="Typo.h6" Class="mb-4" Color="Color.Primary">
+        <MudIcon Icon="@Icons.Material.Filled.Preview" Class="mr-1" />渲染引擎流程
+    </MudText>
+
+    <MudGrid Spacing="3" Class="align-center">
+        @* Step 1 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-success-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.DataObject" Size="Size.Large" Color="Color.Success" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">DSL JSON</MudText>
+                <MudText Typo="Typo.caption">页面描述数据</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="1" Class="d-flex justify-center">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Size="Size.Large" />
+        </MudItem>
+
+        @* Step 2 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-info-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.DataExploration" Size="Size.Large" Color="Color.Info" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">JSON 解析</MudText>
+                <MudText Typo="Typo.caption">反序列化为 DslPage</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="1" Class="d-flex justify-center">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Size="Size.Large" />
+        </MudItem>
+
+        @* Step 3 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-warning-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.DynamicFeed" Size="Size.Large" Color="Color.Warning" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">递归渲染</MudText>
+                <MudText Typo="Typo.caption">DslComponentRenderer</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="1" Class="d-flex justify-center">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Size="Size.Large" />
+        </MudItem>
+
+        @* Step 4 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-primary-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.Web" Size="Size.Large" Color="Color.Primary" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">MudBlazor UI</MudText>
+                <MudText Typo="Typo.caption">动态组件树呈现</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudDivider Class="my-4" />
+
+    <MudText Typo="Typo.body2" Class="mb-2" Color="Color.Default">
+        <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" Class="mr-1" />
+        核心渲染逻辑：
+    </MudText>
+    <pre style="background: var(--mud-palette-surface); padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.6; border: 1px solid var(--mud-palette-lines-default);">
+foreach (component in dslPage.Components)
+{
+    // 1. 检查 visibleIf 表达式 → 决定是否渲染
+    if (!evaluator.Evaluate(component.VisibleIf)) continue;
+
+    // 2. 根据 component.type 匹配 MudBlazor 组件
+    switch (component.Type)
+    {
+        case "text"    → MudTextField
+        case "select"  → MudSelect
+        case "button"  → MudButton
+        case "card"    → MudCard + 递归渲染 children
+        case "grid"    → MudGrid + MudItem(span)
+        case "table"   → MudTable
+        case "chart"   → MudChart
+        ...
+    }
+
+    // 3. 注入 Props、DataBind、Events、ValidationRules
+    // 4. 递归渲染 children → 构建完整组件树
+}</pre>
+</MudPaper>
+
+@* 流程三：事件交互流程 *@
+<MudPaper Elevation="2" Class="pa-6 mb-6">
+    <MudText Typo="Typo.h6" Class="mb-4" Color="Color.Primary">
+        <MudIcon Icon="@Icons.Material.Filled.TouchApp" Class="mr-1" />事件交互流程
+    </MudText>
+
+    <MudGrid Spacing="3" Class="align-center">
+        @* Step 1 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-primary-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.Mouse" Size="Size.Large" Color="Color.Primary" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">用户操作</MudText>
+                <MudText Typo="Typo.caption">点击按钮 / 输入</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="1" Class="d-flex justify-center">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Size="Size.Large" />
+        </MudItem>
+
+        @* Step 2 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-secondary-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.Send" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">事件分发</MudText>
+                <MudText Typo="Typo.caption">DslEventDispatcher</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="1" Class="d-flex justify-center">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Size="Size.Large" />
+        </MudItem>
+
+        @* Step 3 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-tertiary-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.Engineering" Size="Size.Large" Color="Color.Tertiary" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">Handler 执行</MudText>
+                <MudText Typo="Typo.caption">apiCall / navigate / chain</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="1" Class="d-flex justify-center">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Size="Size.Large" />
+        </MudItem>
+
+        @* Step 4 *@
+        <MudItem xs="12" md="2">
+            <MudPaper Class="pa-3 text-center" Style="background: var(--mud-palette-success-lighten); border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.Update" Size="Size.Large" Color="Color.Success" />
+                <MudText Typo="Typo.subtitle2" Class="mt-1">状态更新</MudText>
+                <MudText Typo="Typo.caption">DslDataStore → 重渲染</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudDivider Class="my-4" />
+
+    <MudText Typo="Typo.body2" Class="mb-2" Color="Color.Default">
+        <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Small" Class="mr-1" />
+        三层抽象关系：
+    </MudText>
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-3" Style="border-left: 4px solid var(--mud-palette-primary); border-radius: 0 8px 8px 0;">
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary">L3 · DSL 声明层</MudText>
+                <MudText Typo="Typo.body2">描述"界面长什么样"</MudText>
+                <MudText Typo="Typo.caption">受众：大模型 / 开发者</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-3" Style="border-left: 4px solid var(--mud-palette-secondary); border-radius: 0 8px 8px 0;">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">L2 · 渲染引擎层</MudText>
+                <MudText Typo="Typo.body2">将 DSL 映射到 MudBlazor 组件</MudText>
+                <MudText Typo="Typo.caption">受众：框架开发者</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-3" Style="border-left: 4px solid var(--mud-palette-tertiary); border-radius: 0 8px 8px 0;">
+                <MudText Typo="Typo.subtitle2" Color="Color.Tertiary">L1 · 元模型层</MudText>
+                <MudText Typo="Typo.body2">描述"业务是什么"</MudText>
+                <MudText Typo="Typo.caption">受众：业务分析师 / 大模型</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@code {
+    private void OpenDslPreview(string pageCode)
+    {
+        var parameters = new DialogParameters<DslPreviewDialog>
+        {
+            { x => x.PageCode, pageCode }
+        };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true
+        };
+        DialogService.ShowAsync<DslPreviewDialog>($"{pageCode} DSL 预览", parameters, options);
+    }
+}
