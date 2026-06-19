@@ -1,5 +1,6 @@
 using CJDSL.Domain.Interfaces;
 using CJDSL.Infrastructure.Caching;
+using CJDSL.Infrastructure.Configuration;
 using CJDSL.Infrastructure.LLM;
 using CJDSL.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,9 @@ public static class InfrastructureServiceExtensions
 
         // 验证器
         services.AddSingleton<IDslValidator, DslSemanticValidator>();
+
+        // 系统配置服务
+        services.AddSingleton<SystemConfigService>();
 
         // LLM 响应解析器
         services.AddSingleton<IDslResponseParser, DslResponseParser>();

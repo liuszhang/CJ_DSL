@@ -1,0 +1,513 @@
+@using CJDSL.Blazor.Models
+@using CJDSL.Blazor.Components.Renderers
+@using CJDSL.Web.Services
+@using MudBlazor
+@inject HttpClient HttpClient
+@inject ISnackbar Snackbar
+@inject FloatService FloatService
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.ViewQuilt" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@(DslData?.Title ?? "DSL 预览")</MudText>
+            <MudSpacer />
+            <MudTooltip Text="最小化到浮窗">
+                <MudIconButton Icon="@Icons.Material.Filled.PushPin"
+                               Size="Size.Small"
+                               Color="Color.Inherit"
+                               OnClick="@MinimizeToFloat"
+                               Class="mr-1" />
+            </MudTooltip>
+        </MudStack>
+    </TitleContent>
+
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" Class="ma-8" />
+        }
+        else if (DslData != null)
+        {
+            <MudTabs @bind-ActivePanelIndex="_activeTab" Class="mt-2">
+                <MudTabPanel Text="界面" Icon="@Icons.Material.Filled.Preview">
+                    <MudPaper Class="pa-4 mt-2" Outlined="true" Style="overflow-y: auto; max-height: 70vh;">
+                        <DslPageRenderer DslPage="DslData" User="_user" />
+                    </MudPaper>
+                </MudTabPanel>
+
+                <MudTabPanel Text="DSL" Icon="@Icons.Material.Filled.Code">
+                    <MudPaper Class="pa-4 mt-2" Outlined="true" Style="overflow-y: auto; max-height: 70vh;">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                                <MudButton StartIcon="@Icons.Material.Filled.ContentCopy"
+                                           Size="Size.Small"
+                                           Variant="Variant.Outlined"
+                                           OnClick="@CopyDslJson">
+                                    复制
+                                </MudButton>
+                            </MudStack>
+                            <pre style="background: var(--mud-palette-surface); padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;">@_dslJson</pre>
+                        </MudStack>
+                    </MudPaper>
+                </MudTabPanel>
+            </MudTabs>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Error" Class="ma-4">无法加载 DSL 数据</MudAlert>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string PageCode { get; set; } = string.Empty;
+
+    private CJDSL.Blazor.Models.DslPage? DslData;
+    private string _dslJson = string.Empty;
+    private bool _loading = true;
+    private int _activeTab;
+
+    private readonly CJDSL.Blazor.Models.UserContext _user = new()
+    {
+        UserId = "demo",
+        UserName = "演示用户",
+        Roles = ["operator", "admin"],
+        Permissions = ["repair:create", "repair:edit", "repair:view"]
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDslPage();
+    }
+
+    private async Task LoadDslPage()
+    {
+        _loading = true;
+        try
+        {
+            var response = await HttpClient.GetAsync($"api/dsl/page/{PageCode}");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                _dslJson = FormatJson(json);
+                DslData = System.Text.Json.JsonSerializer.Deserialize<CJDSL.Blazor.Models.DslPage>(json, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            else
+            {
+                DslData = GetFallbackDslPage(PageCode);
+                _dslJson = FormatJson(System.Text.Json.JsonSerializer.Serialize(DslData, new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                }));
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载 DSL 失败: {ex.Message}", Severity.Error);
+            DslData = GetFallbackDslPage(PageCode);
+            _dslJson = FormatJson(System.Text.Json.JsonSerializer.Serialize(DslData, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            }));
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private void MinimizeToFloat()
+    {
+        var title = DslData?.Title ?? PageCode;
+        FloatService.Add(title, PageCode, Icons.Material.Filled.ViewQuilt);
+        MudDialog.Close();
+    }
+
+    private async Task CopyDslJson()
+    {
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _dslJson);
+        Snackbar.Add("DSL JSON 已复制到剪贴板", Severity.Success);
+    }
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
+    private static string FormatJson(string json)
+    {
+        try
+        {
+            var obj = System.Text.Json.JsonSerializer.Deserialize<object>(json);
+            return System.Text.Json.JsonSerializer.Serialize(obj, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            });
+        }
+        catch { return json; }
+    }
+
+    private CJDSL.Blazor.Models.DslPage? GetFallbackDslPage(string pageCode) => pageCode.ToLower() switch
+    {
+        "repair-form" or "page_equipment_repair" => BuildRepairFormDsl(),
+        "equipment-list" => BuildEquipmentListDsl(),
+        "user-form" => BuildUserFormDsl(),
+        "product-form" => BuildProductFormDsl(),
+        "task-board" => BuildTaskBoardDsl(),
+        "dashboard" => BuildDashboardDsl(),
+        _ => null
+    };
+
+    private CJDSL.Blazor.Models.DslPage BuildRepairFormDsl() => new()
+    {
+        Id = "page_equipment_repair",
+        Title = "设备报修单",
+        Layout = "form",
+        Components =
+        [
+            new()
+            {
+                Type = "card",
+                Props = new Dictionary<string, object> { { "Elevation", 2 } },
+                Children =
+                [
+                    new() { Type = "textDisplay", Label = "设备报修单", Props = new Dictionary<string, object> { { "Typo", "h5" } } },
+                    new()
+                    {
+                        Type = "form", Id = "repairForm",
+                        Children =
+                        [
+                            new()
+                            {
+                                Type = "grid",
+                                Children =
+                                [
+                                    new() { Type = "text", Span = 6, Label = "报修单号", FieldName = "repairNo", Props = new() { { "Required", true }, { "ReadOnly", true }, { "Variant", "Filled" } } },
+                                    new() { Type = "text", Span = 6, Label = "设备名称", FieldName = "equipmentName", Props = new() { { "Required", true } } },
+                                    new() { Type = "select", Span = 6, Label = "设备类型", FieldName = "equipmentType", DataSource = new() { Type = "dictionary", Code = "equipment_type" }, Props = new() { { "Required", true } } },
+                                    new() { Type = "date", Span = 6, Label = "报修日期", FieldName = "repairDate", Props = new() { { "Required", true } } },
+                                    new() { Type = "select", Span = 6, Label = "优先级", FieldName = "priority", DataSource = new() { Type = "dictionary", Code = "priority" }, Props = new() { { "Required", true } } },
+                                    new() { Type = "textarea", Span = 12, Label = "故障描述", FieldName = "faultDescription", Props = new() { { "Required", true }, { "Lines", 4 }, { "MaxLength", 500 } } }
+                                ]
+                            },
+                            new() { Type = "divider", Props = new() { { "Class", "my-4" } } },
+                            new()
+                            {
+                                Type = "stack", Props = new() { { "Row", true }, { "Justify", "flex-end" }, { "Spacing", 2 } },
+                                Children =
+                                [
+                                    new() { Type = "button", Label = "重置", Props = new() { { "Variant", "Outlined" }, { "Color", "Secondary" } }, Events = [new() { Type = "onClick", Handler = "reset", Params = new() { { "formId", "repairForm" } } }] },
+                                    new() { Type = "button", Label = "保存", Props = new() { { "Variant", "Filled" }, { "Color", "Primary" } }, Events = [new() { Type = "onClick", Handler = "showToast", Params = new() { { "message", "保存成功" }, { "severity", "success" } } }] },
+                                    new() { Type = "button", Label = "提交", Props = new() { { "Variant", "Filled" }, { "Color", "Tertiary" } }, Events = [new() { Type = "onClick", Handler = "showToast", Params = new() { { "message", "提交成功" }, { "severity", "success" } } }] }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
+
+    private CJDSL.Blazor.Models.DslPage BuildEquipmentListDsl() => new()
+    {
+        Id = "page_equipment_list",
+        Title = "设备列表",
+        Layout = "list",
+        Components =
+        [
+            new()
+            {
+                Type = "card",
+                Children =
+                [
+                    new()
+                    {
+                        Type = "stack", Props = new() { { "Row", true }, { "Spacing", 2 } },
+                        Children =
+                        [
+                            new() { Type = "text", Props = new() { { "Placeholder", "搜索设备" }, { "AdornmentIcon", "Search" } } },
+                            new() { Type = "button", Label = "查询", Props = new() { { "Color", "Primary" }, { "StartIcon", "Search" } } },
+                            new() { Type = "button", Label = "新增", Props = new() { { "Variant", "Outlined" }, { "StartIcon", "Add" } } }
+                        ]
+                    },
+                    new()
+                    {
+                        Type = "table",
+                        Props = new()
+                        {
+                            { "columns", new List<Dictionary<string, object>>
+                                {
+                                    new() { { "title", "设备编号" }, { "dataIndex", "equipmentNo" } },
+                                    new() { { "title", "设备名称" }, { "dataIndex", "equipmentName" } },
+                                    new() { { "title", "设备类型" }, { "dataIndex", "equipmentType" } },
+                                    new() { { "title", "状态" }, { "dataIndex", "status" } },
+                                    new() { { "title", "操作" }, { "dataIndex", "actions" } }
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    };
+
+    private CJDSL.Blazor.Models.DslPage BuildUserFormDsl() => new()
+    {
+        Id = "page_user_form",
+        Title = "用户注册",
+        Layout = "form",
+        Components =
+        [
+            new()
+            {
+                Type = "card", Props = new() { { "Elevation", 2 } },
+                Children =
+                [
+                    new() { Type = "textDisplay", Label = "用户注册", Props = new() { { "Typo", "h5" } } },
+                    new()
+                    {
+                        Type = "form", Id = "userForm",
+                        Children =
+                        [
+                            new()
+                            {
+                                Type = "grid",
+                                Children =
+                                [
+                                    new() { Type = "text", Span = 6, Label = "用户名", FieldName = "username", Props = new() { { "Required", true } } },
+                                    new() { Type = "text", Span = 6, Label = "邮箱", FieldName = "email", Props = new() { { "Required", true } } },
+                                    new() { Type = "text", Span = 6, Label = "手机号", FieldName = "phone", Props = new() { { "Required", true } } },
+                                    new() { Type = "select", Span = 6, Label = "角色", FieldName = "role", DataSource = new() { Type = "enum", Code = "user_role" }, Props = new() { { "Required", true } } },
+                                    new() { Type = "date", Span = 6, Label = "出生日期", FieldName = "birthday" },
+                                    new() { Type = "switch", Span = 6, Label = "启用账户", FieldName = "enabled" }
+                                ]
+                            },
+                            new() { Type = "divider", Props = new() { { "Class", "my-4" } } },
+                            new()
+                            {
+                                Type = "stack", Props = new() { { "Row", true }, { "Justify", "flex-end" }, { "Spacing", 2 } },
+                                Children =
+                                [
+                                    new() { Type = "button", Label = "取消", Props = new() { { "Variant", "Outlined" }, { "Color", "Secondary" } } },
+                                    new() { Type = "button", Label = "注册", Props = new() { { "Variant", "Filled" }, { "Color", "Primary" } }, Events = [new() { Type = "onClick", Handler = "showToast", Params = new() { { "message", "注册成功" }, { "severity", "success" } } }] }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
+
+    private CJDSL.Blazor.Models.DslPage BuildProductFormDsl() => new()
+    {
+        Id = "page_product_form",
+        Title = "产品录入",
+        Layout = "form",
+        Components =
+        [
+            new()
+            {
+                Type = "card", Props = new() { { "Elevation", 2 } },
+                Children =
+                [
+                    new() { Type = "textDisplay", Label = "产品录入", Props = new() { { "Typo", "h5" } } },
+                    new()
+                    {
+                        Type = "form", Id = "productForm",
+                        Children =
+                        [
+                            new()
+                            {
+                                Type = "grid",
+                                Children =
+                                [
+                                    new() { Type = "text", Span = 6, Label = "产品名称", FieldName = "productName", Props = new() { { "Required", true } } },
+                                    new() { Type = "text", Span = 6, Label = "产品编码", FieldName = "productCode", Props = new() { { "Required", true } } },
+                                    new() { Type = "select", Span = 6, Label = "产品分类", FieldName = "category", DataSource = new() { Type = "enum", Code = "product_category" }, Props = new() { { "Required", true } } },
+                                    new() { Type = "number", Span = 6, Label = "单价", FieldName = "price", Props = new() { { "Required", true } } },
+                                    new() { Type = "number", Span = 6, Label = "库存", FieldName = "stock", Props = new() { { "Required", true } } },
+                                    new() { Type = "select", Span = 6, Label = "状态", FieldName = "status", DataSource = new() { Type = "enum", Code = "product_status" } },
+                                    new() { Type = "textarea", Span = 12, Label = "产品描述", FieldName = "description", Props = new() { { "Lines", 3 } } }
+                                ]
+                            },
+                            new() { Type = "divider", Props = new() { { "Class", "my-4" } } },
+                            new()
+                            {
+                                Type = "stack", Props = new() { { "Row", true }, { "Justify", "flex-end" }, { "Spacing", 2 } },
+                                Children =
+                                [
+                                    new() { Type = "button", Label = "取消", Props = new() { { "Variant", "Outlined" }, { "Color", "Secondary" } } },
+                                    new() { Type = "button", Label = "保存", Props = new() { { "Variant", "Filled" }, { "Color", "Primary" } }, Events = [new() { Type = "onClick", Handler = "showToast", Params = new() { { "message", "保存成功" }, { "severity", "success" } } }] }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
+
+    private CJDSL.Blazor.Models.DslPage BuildTaskBoardDsl() => new()
+    {
+        Id = "page_task_board",
+        Title = "任务看板",
+        Layout = "list",
+        Components =
+        [
+            new()
+            {
+                Type = "card",
+                Children =
+                [
+                    new() { Type = "textDisplay", Label = "任务看板", Props = new() { { "Typo", "h5" } } },
+                    new()
+                    {
+                        Type = "tabs",
+                        Children =
+                        [
+                            new() { Label = "待办", Children = [new() { Type = "alert", Props = new() { { "Severity", "Info" }, { "Message", "3 个待办任务" } } }] },
+                            new() { Label = "进行中", Children = [new() { Type = "alert", Props = new() { { "Severity", "Warning" }, { "Message", "2 个进行中任务" } } }] },
+                            new() { Label = "已完成", Children = [new() { Type = "alert", Props = new() { { "Severity", "Success" }, { "Message", "5 个已完成任务" } } }] }
+                        ]
+                    },
+                    new()
+                    {
+                        Type = "stack", Props = new() { { "Row", true }, { "Spacing", 2 }, { "Class", "mt-4" } },
+                        Children =
+                        [
+                            new() { Type = "button", Label = "新增任务", Props = new() { { "Variant", "Filled" }, { "Color", "Primary" }, { "StartIcon", "Add" } } },
+                            new() { Type = "button", Label = "筛选", Props = new() { { "Variant", "Outlined" }, { "StartIcon", "FilterList" } } }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
+
+    private CJDSL.Blazor.Models.DslPage BuildDashboardDsl() => new()
+    {
+        Id = "page_dashboard",
+        Title = "数据仪表盘",
+        Layout = "dashboard",
+        Components =
+        [
+            new()
+            {
+                Type = "grid",
+                Children =
+                [
+                    new()
+                    {
+                        Span = 3,
+                        Type = "card", Props = new() { { "Elevation", 1 } },
+                        Children =
+                        [
+                            new() { Type = "textDisplay", Label = "1,234", Props = new() { { "Typo", "h4" } } },
+                            new() { Type = "textDisplay", Label = "总用户数", Props = new() { { "Typo", "caption" } } }
+                        ]
+                    },
+                    new()
+                    {
+                        Span = 3,
+                        Type = "card", Props = new() { { "Elevation", 1 } },
+                        Children =
+                        [
+                            new() { Type = "textDisplay", Label = "567", Props = new() { { "Typo", "h4" } } },
+                            new() { Type = "textDisplay", Label = "活跃设备", Props = new() { { "Typo", "caption" } } }
+                        ]
+                    },
+                    new()
+                    {
+                        Span = 3,
+                        Type = "card", Props = new() { { "Elevation", 1 } },
+                        Children =
+                        [
+                            new() { Type = "textDisplay", Label = "89", Props = new() { { "Typo", "h4" } } },
+                            new() { Type = "textDisplay", Label = "待处理工单", Props = new() { { "Typo", "caption" } } }
+                        ]
+                    },
+                    new()
+                    {
+                        Span = 3,
+                        Type = "card", Props = new() { { "Elevation", 1 } },
+                        Children =
+                        [
+                            new() { Type = "textDisplay", Label = "98.5%", Props = new() { { "Typo", "h4" } } },
+                            new() { Type = "textDisplay", Label = "系统可用率", Props = new() { { "Typo", "caption" } } }
+                        ]
+                    }
+                ]
+            },
+            new()
+            {
+                Type = "grid", Props = new() { { "Class", "mt-4" } },
+                Children =
+                [
+                    new()
+                    {
+                        Span = 8,
+                        Type = "card",
+                        Children =
+                        [
+                            new() { Type = "textDisplay", Label = "工单趋势", Props = new() { { "Typo", "h6" } } },
+                            new()
+                            {
+                                Type = "chart",
+                                Props = new()
+                                {
+                                    { "ChartType", "line" },
+                                    { "Height", "250px" },
+                                    { "Labels", new List<string> { "周一", "周二", "周三", "周四", "周五", "周六", "周日" } },
+                                    { "Series", new List<Dictionary<string, object>>
+                                        {
+                                            new() { { "name", "新增" }, { "data", new List<object> { 12, 19, 8, 15, 22, 10, 14 } } },
+                                            new() { { "name", "完成" }, { "data", new List<object> { 10, 15, 12, 18, 20, 8, 16 } } }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    new()
+                    {
+                        Span = 4,
+                        Type = "card",
+                        Children =
+                        [
+                            new() { Type = "textDisplay", Label = "设备类型分布", Props = new() { { "Typo", "h6" } } },
+                            new()
+                            {
+                                Type = "chart",
+                                Props = new()
+                                {
+                                    { "ChartType", "donut" },
+                                    { "Height", "250px" },
+                                    { "PieData", new List<Dictionary<string, object>>
+                                        {
+                                            new() { { "label", "服务器" }, { "value", 45 } },
+                                            new() { { "label", "网络设备" }, { "value", 30 } },
+                                            new() { { "label", "存储设备" }, { "value", 15 } },
+                                            new() { { "label", "其他" }, { "value", 10 } }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
+}
