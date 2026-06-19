@@ -1,0 +1,61 @@
+@using System.Text.Json
+@using CJDSL.Blazor.Events
+@using CJDSL.Blazor.Expressions
+@using CJDSL.Blazor.Models
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject HttpClient HttpClient
+
+@if (DslPage != null)
+{
+    <CascadingValue Value="_context">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
+            @foreach (var component in DslPage.Components)
+            {
+                <DslComponentRenderer Component="component" />
+            }
+        </MudContainer>
+    </CascadingValue>
+}
+else
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    <MudText Typo="Typo.body1" Class="mt-4">加载中...</MudText>
+}
+
+@code {
+    [Parameter] public DslPage? DslPage { get; set; }
+    [Parameter] public UserContext? User { get; set; }
+    [Parameter] public Dictionary<string, object>? InitialData { get; set; }
+
+    private DslRenderContext _context = null!;
+    private DslEventDispatcher _dispatcher = null!;
+
+    protected override void OnParametersSet()
+    {
+        if (DslPage != null)
+        {
+            _context = new DslRenderContext
+            {
+                Page = DslPage,
+                User = User ?? new UserContext(),
+                ExpressionEvaluator = new ClientJintEvaluator()
+            };
+
+            _dispatcher = new DslEventDispatcher(
+                HttpClient, Snackbar, Navigation, DialogService, JSRuntime);
+
+            if (InitialData != null)
+            {
+                foreach (var kv in InitialData)
+                    _context.DataStore.Set($"data.{kv.Key}", kv.Value);
+            }
+
+            // 监听数据变化
+            _context.DataStore.DataChanged += (s, e) => StateHasChanged();
+        }
+    }
+}

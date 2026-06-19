@@ -1,0 +1,40 @@
+@page "/"
+@rendermode RenderMode.InteractiveServer
+
+<MudText Typo="Typo.h3" Class="mb-4">欢迎使用 CJDSL</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">
+    CJDSL 是一套新一代 DSL 驱动 Web 应用系统，基于 .NET 10 + Blazor + MudBlazor 构建。
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">核心特性</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudList T="string">
+                    <MudListItem>大模型实时生成 DSL 声明式界面</MudListItem>
+                    <MudListItem>统一渲染引擎映射到 MudBlazor 组件</MudListItem>
+                    <MudListItem>七维元模型驱动业务逻辑</MudListItem>
+                    <MudListItem>上下文感知：权限、设备、角色</MudListItem>
+                </MudList>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">快速体验</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudButton Href="/dsl/repair-form" Variant="Variant.Filled" Color="Color.Primary" Class="mr-2">
+                    设备报修单
+                </MudButton>
+                <MudButton Href="/dsl/equipment-list" Variant="Variant.Outlined" Color="Color.Secondary">
+                    设备列表
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>

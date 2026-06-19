@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+    <title>CJDSL - DSL 驱动 Web 应用系统</title>
+</head>
+<body>
+    <Routes @rendermode="RenderMode.InteractiveServer" />
+    <div id="blazor-error-ui">
+        <environment include="Staging,Production">
+            发生错误。请刷新页面或联系管理员。
+        </environment>
+        <environment include="Development">
+            发生未处理的异常。详情请查看浏览器开发者工具。
+        </environment>
+        <a href="" class="reload">重新加载</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script src="_framework/blazor.web.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_content/CJDSL.Blazor/js/cjdsl-richtext.js"></script>
+</body>
+</html>

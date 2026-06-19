@@ -1,0 +1,13 @@
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>页面未找到</PageTitle>
+        <LayoutView Layout="typeof(MainLayout)">
+            <MudText Typo="Typo.h4">404 - 页面未找到</MudText>
+            <MudButton Href="/">返回首页</MudButton>
+        </LayoutView>
+    </NotFound>
+</Router>

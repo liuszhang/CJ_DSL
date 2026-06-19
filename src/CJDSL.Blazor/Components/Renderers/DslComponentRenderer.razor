@@ -1,0 +1,516 @@
+@using System.Text.RegularExpressions
+@using CJDSL.Blazor.Models
+@using Microsoft.JSInterop
+@using MudBlazor
+
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject HttpClient HttpClient
+
+@if (CheckVisibility())
+{
+    @switch (Component.Type)
+    {
+        case "card":
+            <MudCard Elevation="@GetIntProp("Elevation", 1)" Class="@GetStringProp("Class")">
+                @if (!string.IsNullOrEmpty(Component.Label))
+                {
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">@Component.Label</MudText>
+                    </MudCardHeader>
+                }
+                <MudCardContent>
+                    @RenderChildren()
+                </MudCardContent>
+            </MudCard>
+            break;
+
+        case "form":
+            <MudForm @ref="_formRef" @bind-IsValid="_isValid">
+                @RenderChildren()
+            </MudForm>
+            break;
+
+        case "grid":
+            <MudGrid>
+                @foreach (var child in Component.Children ?? Enumerable.Empty<DslComponent>())
+                {
+                    <MudItem xs="12" sm="@GetSpan(child)" md="@GetSpan(child)">
+                        <DslComponentRenderer Component="child" />
+                    </MudItem>
+                }
+            </MudGrid>
+            break;
+
+        case "stack":
+            <MudStack Row="@GetBoolProp("Row")" Spacing="@GetIntProp("Spacing", 2)" Justify="@GetJustify()" AlignItems="@GetAlignItems()" Class="@GetStringProp("Class")">
+                @RenderChildren()
+            </MudStack>
+            break;
+
+        case "paper":
+            <MudPaper Elevation="@GetIntProp("Elevation", 1)" Class="@GetStringProp("Class")" Square="@GetBoolProp("Square")">
+                @RenderChildren()
+            </MudPaper>
+            break;
+
+        case "text":
+            <MudTextField T="string"
+                          @bind-Value="_stringValue"
+                          Label="@Component.Label"
+                          Required="@GetBoolProp("Required")"
+                          ReadOnly="@GetBoolProp("ReadOnly")"
+                          Variant="@GetVariant()"
+                          Placeholder="@GetStringProp("Placeholder")"
+                          AdornmentIcon="@GetIcon("AdornmentIcon")"
+                          MaxLength="@GetIntProp("MaxLength")"
+                          Disabled="@IsDisabled()"
+                          For="@(() => _stringValue)"
+                          Class="@GetStringProp("Class")" />
+            break;
+
+        case "number":
+            <MudNumericField T="decimal"
+                           @bind-Value="_decimalValue"
+                           Label="@Component.Label"
+                           Required="@GetBoolProp("Required")"
+                           Variant="@GetVariant()"
+                           Disabled="@IsDisabled()"
+                           Class="@GetStringProp("Class")" />
+            break;
+
+        case "select":
+            <MudSelect T="string"
+                       @bind-Value="_stringValue"
+                       Label="@Component.Label"
+                       Required="@GetBoolProp("Required")"
+                       Clearable="@GetBoolProp("Clearable")"
+                       Variant="@GetVariant()"
+                       Disabled="@IsDisabled()"
+                       Class="@GetStringProp("Class")">
+                @foreach (var item in GetSelectItems())
+                {
+                    <MudSelectItem Value="@item.Value">@item.Label</MudSelectItem>
+                }
+            </MudSelect>
+            break;
+
+        case "autocomplete":
+            <MudAutocomplete T="string"
+                             @bind-Value="_stringValue"
+                             Label="@Component.Label"
+                             Required="@GetBoolProp("Required")"
+                             Variant="@GetVariant()"
+                             Disabled="@IsDisabled()"
+                             SearchFunc="@SearchAutoComplete"
+                             Class="@GetStringProp("Class")" />
+            break;
+
+        case "textarea":
+            <MudTextField T="string"
+                          @bind-Value="_stringValue"
+                          Label="@Component.Label"
+                          Required="@GetBoolProp("Required")"
+                          Lines="@GetIntProp("Lines", 3)"
+                          MaxLength="@GetIntProp("MaxLength")"
+                          Variant="@GetVariant()"
+                          Disabled="@IsDisabled()"
+                          Class="@GetStringProp("Class")" />
+            break;
+
+        case "date":
+            <MudDatePicker @bind-Date="_dateValue"
+                           Label="@Component.Label"
+                           Required="@GetBoolProp("Required")"
+                           Disabled="@IsDisabled()"
+                           Class="@GetStringProp("Class")" />
+            break;
+
+        case "datetime":
+            <MudDatePicker @bind-Date="_dateValue"
+                           Label="@Component.Label"
+                           Required="@GetBoolProp("Required")"
+                           Disabled="@IsDisabled()"
+                           ShowToolbar="false"
+                           Class="@GetStringProp("Class")" />
+            break;
+
+        case "time":
+            <MudTimePicker @bind-Time="_timeValue"
+                           Label="@Component.Label"
+                           Required="@GetBoolProp("Required")"
+                           Disabled="@IsDisabled()"
+                           Class="@GetStringProp("Class")" />
+            break;
+
+        case "switch":
+            <MudSwitch T="bool"
+                       @bind-Value="_boolValue"
+                       Label="@Component.Label"
+                       Disabled="@IsDisabled()"
+                       Color="Color.Primary"
+                       Class="@GetStringProp("Class")" />
+            break;
+
+        case "checkbox":
+            <MudCheckBox T="bool"
+                         @bind-Value="_boolValue"
+                         Label="@Component.Label"
+                         Disabled="@IsDisabled()"
+                         Color="Color.Primary"
+                         Class="@GetStringProp("Class")" />
+            break;
+
+        case "radio":
+            <MudField Label="@Component.Label" Disabled="@IsDisabled()">
+                <MudRadioGroup T="string" @bind-SelectedOption="_stringValue">
+                    @foreach (var item in GetSelectItems())
+                    {
+                        <MudRadio T="string" Option="@item.Value">@item.Label</MudRadio>
+                    }
+                </MudRadioGroup>
+            </MudField>
+            break;
+
+        case "slider":
+            <MudSlider T="decimal"
+                        @bind-Value="_decimalValue"
+                        Min="@(GetDecimalProp("Min", 0) ?? 0)"
+                        Max="@(GetDecimalProp("Max", 100) ?? 100)"
+                        Disabled="@IsDisabled()"
+                        Color="Color.Primary"
+                        Class="@GetStringProp("Class")" />
+            break;
+
+        case "rating":
+            <MudRating @bind-SelectedValue="_intValue"
+                       MaxValue="@GetIntProp("Max", 5)"
+                       Disabled="@IsDisabled()"
+                       Class="@GetStringProp("Class")" />
+            break;
+
+        case "button":
+            <MudButton OnClick="@HandleClick"
+                       Variant="@GetButtonVariant()"
+                       Color="@GetColor()"
+                       StartIcon="@GetIcon("StartIcon")"
+                       EndIcon="@GetIcon("EndIcon")"
+                       Size="@GetSize()"
+                       Disabled="@IsDisabled()"
+                       Class="@GetStringProp("Class")">
+                @GetButtonLabel()
+            </MudButton>
+            break;
+
+        case "iconButton":
+            <MudIconButton Icon="@GetIcon("Icon")"
+                          Color="@GetColor()"
+                          Size="@GetSize()"
+                          Disabled="@IsDisabled()"
+                          OnClick="@HandleClick"
+                          Class="@GetStringProp("Class")" />
+            break;
+
+        case "textDisplay":
+            <MudText Typo="@GetTypo()" Class="@GetStringProp("Class")" Color="@GetTextColor()">
+                @GetDisplayText()
+            </MudText>
+            break;
+
+        case "divider":
+            <MudDivider Class="@GetStringProp("Class")" />
+            break;
+
+        case "chip":
+            <MudChip T="string"
+                      Text="@(Component.Label ?? "")"
+                      Color="@GetColor()"
+                      Variant="@GetChipVariant()"
+                      Size="@GetSize()"
+                      Disabled="@IsDisabled()"
+                      Class="@GetStringProp("Class")" />
+            break;
+
+        case "badge":
+            <MudBadge Content="@(GetStringProp("Content") ?? "")"
+                      Color="@GetColor()"
+                      Overlap="@GetBoolProp("Overlap")"
+                      Visible="@(!string.IsNullOrEmpty(GetStringProp("Content")))"
+                      Class="@GetStringProp("Class")">
+                @RenderChildren()
+            </MudBadge>
+            break;
+
+        case "avatar":
+            <MudAvatar Color="@GetColor()" Size="@GetSize()" Class="@GetStringProp("Class")">
+                @(Component.Label ?? GetStringProp("Text") ?? "")
+            </MudAvatar>
+            break;
+
+        case "progress":
+            @if (GetBoolProp("Circular"))
+            {
+                <MudProgressCircular Color="@GetColor()" Size="@GetSize()" Value="@GetIntProp("Value", 50)" Max="@GetIntProp("Max", 100)" Class="@GetStringProp("Class")" />
+            }
+            else
+            {
+                <MudProgressLinear Color="@GetColor()" Value="@GetIntProp("Value", 50)" Max="@GetIntProp("Max", 100)" Class="@GetStringProp("Class")" />
+            }
+            break;
+
+        case "skeleton":
+            <MudSkeleton SkeletonType="@GetSkeletonType()" Width="100%" Height="@GetStringProp("Height", "40px")" Class="@GetStringProp("Class")" />
+            break;
+
+        case "expansion":
+            <MudExpansionPanels MultiExpansion="@GetBoolProp("MultiExpansion")" Class="@GetStringProp("Class")">
+                @RenderChildren()
+            </MudExpansionPanels>
+            break;
+
+        case "expansionPanel":
+            <MudExpansionPanel Text="@(Component.Label ?? "")" Disabled="@IsDisabled()">
+                @RenderChildren()
+            </MudExpansionPanel>
+            break;
+
+        case "tooltip":
+            <MudTooltip Text="@(GetStringProp("Text") ?? Component.Label ?? "")" Placement="@GetPlacement()">
+                @RenderChildren()
+            </MudTooltip>
+            break;
+
+        case "tabs":
+            <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Class="@GetStringProp("Class")">
+                @if (Component.Children != null)
+                {
+                    @foreach (var child in Component.Children)
+                    {
+                        <MudTabPanel Text="@(child.Label ?? "Tab")">
+                            @if (child.Children != null)
+                            {
+                                @foreach (var grandChild in child.Children)
+                                {
+                                    <DslComponentRenderer Component="grandChild" />
+                                }
+                            }
+                        </MudTabPanel>
+                    }
+                }
+            </MudTabs>
+            break;
+
+        case "stepper":
+            <MudStepper @bind-ActiveIndex="_activeTabIndex" Class="@GetStringProp("Class")">
+                @if (Component.Children != null)
+                {
+                    @foreach (var child in Component.Children)
+                    {
+                        <MudStep @key="child.Id" Text="@(child.Label ?? "Step")" Disabled="@IsDisabled()">
+                            @if (child.Children != null)
+                            {
+                                @foreach (var grandChild in child.Children)
+                                {
+                                    <DslComponentRenderer Component="grandChild" />
+                                }
+                            }
+                        </MudStep>
+                    }
+                }
+            </MudStepper>
+            break;
+
+        case "pagination":
+            <MudPagination Selected="@GetIntProp("CurrentPage", 1)"
+                          Count="@GetIntProp("TotalPages", 1)"
+                          SelectedChanged="@HandlePageChange"
+                          Class="@GetStringProp("Class")" />
+            break;
+
+        case "alert":
+            <MudAlert Severity="@GetSeverity()" Class="@GetStringProp("Class")">
+                @(Component.Label ?? GetStringProp("Message") ?? "")
+            </MudAlert>
+            break;
+
+        case "list":
+            <MudList T="string" Class="@GetStringProp("Class")">
+                @RenderChildren()
+            </MudList>
+            break;
+
+        case "listItem":
+            <MudListItem T="string" Text="@(Component.Label ?? "")" Disabled="@IsDisabled()" Class="@GetStringProp("Class")">
+                @RenderChildren()
+            </MudListItem>
+            break;
+
+        case "table":
+            <MudTable Items="@GetTableData()" Hover="true" Striped="true" Dense="true" Class="@GetStringProp("Class")">
+                <HeaderContent>
+                    @foreach (var col in GetTableColumns())
+                    {
+                        <MudTh>@col.GetValueOrDefault("title")?.ToString()</MudTh>
+                    }
+                </HeaderContent>
+                <RowTemplate>
+                    @foreach (var col in GetTableColumns())
+                    {
+                        <MudTd DataLabel="@col.GetValueOrDefault("title")?.ToString()">
+                            @GetCellValue(context, col.GetValueOrDefault("dataIndex")?.ToString() ?? "")
+                        </MudTd>
+                    }
+                </RowTemplate>
+            </MudTable>
+            break;
+
+        case "file":
+            <DslFileUploadRenderer Component="Component" />
+            break;
+
+        case "richText":
+            <DslRichTextRenderer Component="Component" />
+            break;
+
+        case "chart":
+            <DslChartRenderer Component="Component" />
+            break;
+
+        default:
+            <MudAlert Severity="Severity.Warning">
+                未识别的组件类型: @Component.Type
+            </MudAlert>
+            break;
+    }
+}
+
+@code {
+    [CascadingParameter] public DslRenderContext Context { get; set; } = null!;
+    [Parameter] public DslComponent Component { get; set; } = null!;
+
+    private MudForm? _formRef;
+    private string _stringValue = string.Empty;
+    private decimal _decimalValue;
+    private DateTime? _dateValue;
+    private TimeSpan? _timeValue;
+    private bool _boolValue;
+    private int _intValue;
+    private bool _isValid;
+    private int _activeTabIndex;
+
+    private bool CheckVisibility()
+    {
+        if (string.IsNullOrEmpty(Component.VisibleIf)) return true;
+        return Context.ExpressionEvaluator.Evaluate<bool>(Component.VisibleIf, Context.DataStore);
+    }
+
+    private bool IsDisabled()
+    {
+        if (string.IsNullOrEmpty(Component.DisabledIf)) return false;
+        return Context.ExpressionEvaluator.Evaluate<bool>(Component.DisabledIf, Context.DataStore);
+    }
+
+    private RenderFragment RenderChildren() => builder =>
+    {
+        if (Component.Children == null) return;
+        foreach (var child in Component.Children)
+        {
+            builder.OpenComponent(0, typeof(DslComponentRenderer));
+            builder.AddAttribute(1, "Component", child);
+            builder.CloseComponent();
+        }
+    };
+
+    private T? GetProp<T>(string key) => Component.Props?.GetValueOrDefault(key) is T v ? v : default;
+    private string? GetStringProp(string key, string? defaultValue = null) => Component.Props?.GetValueOrDefault(key) is string v ? v : defaultValue;
+    private int GetIntProp(string key, int defaultValue = 0) => Component.Props?.GetValueOrDefault(key) is int v ? v : defaultValue;
+    private bool GetBoolProp(string key) => Component.Props?.GetValueOrDefault(key) is bool v ? v : false;
+    private decimal? GetDecimalProp(string key, decimal? defaultValue = null) => Component.Props?.GetValueOrDefault(key) is decimal v ? v : defaultValue;
+
+    private Variant GetVariant() => Enum.TryParse<Variant>(GetStringProp("Variant"), out var v) ? v : Variant.Text;
+    private Variant GetButtonVariant() => Enum.TryParse<Variant>(GetStringProp("Variant"), out var v) ? v : Variant.Filled;
+    private Variant GetChipVariant() => Enum.TryParse<Variant>(GetStringProp("Variant"), out var v) ? v : Variant.Filled;
+    private Color GetColor() => Enum.TryParse<Color>(GetStringProp("Color"), out var c) ? c : Color.Default;
+    private Typo GetTypo() => Enum.TryParse<Typo>(GetStringProp("Typo"), out var t) ? t : Typo.body1;
+    private Size GetSize() => Enum.TryParse<Size>(GetStringProp("Size"), out var s) ? s : Size.Medium;
+    private Color GetTextColor() => Enum.TryParse<Color>(GetStringProp("Color"), out var c) ? c : Color.Default;
+    private Justify GetJustify() => Enum.TryParse<Justify>(GetStringProp("Justify"), out var j) ? j : Justify.FlexStart;
+    private AlignItems GetAlignItems() => Enum.TryParse<AlignItems>(GetStringProp("AlignItems"), out var a) ? a : AlignItems.Center;
+    private Placement GetPlacement() => Enum.TryParse<Placement>(GetStringProp("Placement"), out var p) ? p : Placement.Top;
+    private Severity GetSeverity() => Enum.TryParse<Severity>(GetStringProp("Severity"), out var s) ? s : Severity.Info;
+    private SkeletonType GetSkeletonType() => Enum.TryParse<SkeletonType>(GetStringProp("SkeletonType"), out var s) ? s : SkeletonType.Text;
+
+    private string? GetIcon(string propKey)
+    {
+        var iconName = GetStringProp(propKey);
+        if (string.IsNullOrEmpty(iconName)) return null;
+        if (iconName.StartsWith("@")) return iconName;
+        return $"@Icons.Material.Filled.{iconName}";
+    }
+
+    private int GetSpan(DslComponent child) => child.Span ?? 12;
+    private string GetButtonLabel() => Component.Label ?? GetStringProp("children") ?? "Button";
+    private string GetDisplayText() => Component.DataBind != null ? Context.DataStore.GetString(Component.DataBind) ?? Component.Label ?? "" : Component.Label ?? "";
+
+    private List<SelectItem> GetSelectItems()
+    {
+        if (Component.DataSource?.Type == "dictionary" || Component.DataSource?.Type == "enum")
+        {
+            return Context.DataStore.GetList<SelectItem>($"dict.{Component.DataSource.Code}") ?? new List<SelectItem>();
+        }
+        if (Component.DataSource?.Type == "static" && Component.DataSource.StaticData != null)
+        {
+            return Component.DataSource.StaticData.Select(d => new SelectItem
+            {
+                Value = d.GetValueOrDefault("value")?.ToString() ?? "",
+                Label = d.GetValueOrDefault("label")?.ToString() ?? ""
+            }).ToList();
+        }
+        return new List<SelectItem>();
+    }
+
+    private async Task<IEnumerable<string>> SearchAutoComplete(string value, CancellationToken token)
+    {
+        var items = GetSelectItems();
+        if (string.IsNullOrEmpty(value))
+            return items.Select(i => i.Label);
+        return items.Where(i => i.Label.Contains(value, StringComparison.OrdinalIgnoreCase)).Select(i => i.Label);
+    }
+
+    private List<Dictionary<string, object>> GetTableColumns()
+    {
+        return Component.Props?.GetValueOrDefault("columns") as List<Dictionary<string, object>> ?? new List<Dictionary<string, object>>();
+    }
+
+    private List<Dictionary<string, object>> GetTableData()
+    {
+        return Context.DataStore.GetList<Dictionary<string, object>>("datasource.items") ?? new List<Dictionary<string, object>>();
+    }
+
+    private string GetCellValue(Dictionary<string, object> row, string dataIndex)
+    {
+        return row.GetValueOrDefault(dataIndex)?.ToString() ?? "";
+    }
+
+    private async Task HandleClick(MouseEventArgs e)
+    {
+        if (Component.Events == null) return;
+
+        var dispatcher = new CJDSL.Blazor.Events.DslEventDispatcher(
+            HttpClient, Snackbar, Navigation, DialogService, JSRuntime);
+
+        foreach (var evt in Component.Events.Where(ev => ev.Type == "onClick"))
+        {
+            await dispatcher.DispatchAsync(evt, Component, Context);
+        }
+    }
+
+    private void HandlePageChange(int page)
+    {
+        _intValue = page;
+        Context.DataStore.Set($"data.{Component.FieldName ?? "currentPage"}", page);
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <AssemblyName>CJDSL.Web</AssemblyName>
+    <RootNamespace>CJDSL.Web</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CJDSL.Api\CJDSL.Api.csproj" />
+    <ProjectReference Include="..\CJDSL.Blazor\CJDSL.Blazor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MudBlazor" />
+  </ItemGroup>
+
+</Project>

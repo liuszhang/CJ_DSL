@@ -1,0 +1,87 @@
+using CJDSL.Application.Dsl;
+using CJDSL.Application.Dsl.Commands;
+using CJDSL.Application.Dsl.Queries;
+using CJDSL.Domain.Entities.Dsl;
+using CJDSL.Domain.Interfaces;
+using CJDSL.Domain.Shared;
+using MediatR;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
+
+namespace CJDSL.Api.Endpoints;
+
+public static class DslEndpoints
+{
+    public static IEndpointRouteBuilder MapDslEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/dsl")
+            .WithTags("DSL")
+            .WithOpenApi();
+
+        // 基于元模型生成 DSL
+        group.MapPost("/generate", async (
+            GenerateDslRequest request,
+            IMediator mediator,
+            CancellationToken ct) =>
+        {
+            var command = new GenerateDslCommand(
+                request.MetaObjectCode,
+                request.Layout,
+                request.UserContext,
+                request.Options);
+            var result = await mediator.Send(command, ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+        });
+
+        // 基于自然语言生成 DSL
+        group.MapPost("/generate-from-nlp", async (
+            GenerateFromNlpRequest request,
+            IMediator mediator,
+            CancellationToken ct) =>
+        {
+            var result = Result.Success<DslPage>(new DslPage { Title = "NLP 生成页面", Layout = "form" });
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.BadRequest(new { error = result.Error });
+        });
+
+        // 基于当前上下文动态调整 DSL
+        group.MapPost("/adapt", async (
+            AdaptDslRequest request,
+            IMediator mediator,
+            CancellationToken ct) =>
+        {
+            return Results.Ok(request.BaseDsl);
+        });
+
+        // 获取页面 DSL
+        group.MapGet("/page/{pageCode}", async (
+            string pageCode,
+            [FromQuery] string? role,
+            [FromQuery] string? device,
+            IMediator mediator,
+            CancellationToken ct) =>
+        {
+            var query = new GetDslQuery(pageCode, role, device);
+            var result = await mediator.Send(query, ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.NotFound(new { error = result.Error, code = result.ErrorCode });
+        });
+
+        // 验证 DSL 语法
+        group.MapPost("/validate", async (
+            DslPage dsl,
+            IDslValidator validator) =>
+        {
+            var result = await validator.ValidateAsync(dsl);
+            return Results.Ok(result);
+        });
+
+        return app;
+    }
+}

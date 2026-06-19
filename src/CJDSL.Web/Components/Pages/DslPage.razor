@@ -1,0 +1,182 @@
+@page "/dsl/{pageCode}"
+@rendermode RenderMode.InteractiveServer
+@inject HttpClient HttpClient
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4" Class="mb-4">DSL 页面: @PageCode</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else if (_dslPage != null)
+{
+    <DslPageRenderer DslPage="_dslPage" User="_user" />
+}
+else
+{
+    <MudAlert Severity="Severity.Error">无法加载 DSL 页面: @PageCode</MudAlert>
+}
+
+@code {
+    [Parameter] public string PageCode { get; set; } = string.Empty;
+
+    private bool _loading = true;
+    private CJDSL.Blazor.Models.DslPage? _dslPage;
+    private CJDSL.Blazor.Models.UserContext _user = new()
+    {
+        UserId = "demo",
+        UserName = "演示用户",
+        Roles = new List<string> { "operator", "admin" },
+        Permissions = new List<string> { "repair:create", "repair:edit", "repair:view" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDslPage();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadDslPage();
+    }
+
+    private async Task LoadDslPage()
+    {
+        _loading = true;
+        try
+        {
+            var response = await HttpClient.GetAsync($"api/dsl/page/{PageCode}");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                _dslPage = System.Text.Json.JsonSerializer.Deserialize<CJDSL.Blazor.Models.DslPage>(json, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            else
+            {
+                _dslPage = await GetFallbackDslPage(PageCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载 DSL 失败: {ex.Message}", Severity.Error);
+            _dslPage = await GetFallbackDslPage(PageCode);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task<CJDSL.Blazor.Models.DslPage?> GetFallbackDslPage(string pageCode)
+    {
+        return pageCode.ToLower() switch
+        {
+            "repair-form" or "page_equipment_repair" => BuildRepairFormDsl(),
+            "equipment-list" => BuildEquipmentListDsl(),
+            _ => null
+        };
+    }
+
+    private CJDSL.Blazor.Models.DslPage BuildRepairFormDsl()
+    {
+        return new CJDSL.Blazor.Models.DslPage
+        {
+            Id = "page_equipment_repair",
+            Title = "设备报修单",
+            Layout = "form",
+            Components = new List<CJDSL.Blazor.Models.DslComponent>
+            {
+                new()
+                {
+                    Type = "card",
+                    Props = new Dictionary<string, object> { { "Elevation", 2 } },
+                    Children = new List<CJDSL.Blazor.Models.DslComponent>
+                    {
+                        new() { Type = "textDisplay", Label = "设备报修单", Props = new Dictionary<string, object> { { "Typo", "h5" } } },
+                        new()
+                        {
+                            Type = "form", Id = "repairForm",
+                            Children = new List<CJDSL.Blazor.Models.DslComponent>
+                            {
+                                new()
+                                {
+                                    Type = "grid",
+                                    Children = new List<CJDSL.Blazor.Models.DslComponent>
+                                    {
+                                        new() { Type = "text", Span = 6, Label = "报修单号", FieldName = "repairNo", Props = new Dictionary<string, object> { { "Required", true }, { "ReadOnly", true }, { "Variant", "Filled" } } },
+                                        new() { Type = "text", Span = 6, Label = "设备名称", FieldName = "equipmentName", Props = new Dictionary<string, object> { { "Required", true } } },
+                                        new() { Type = "select", Span = 6, Label = "设备类型", FieldName = "equipmentType", DataSource = new CJDSL.Blazor.Models.DslDataSource { Type = "dictionary", Code = "equipment_type" }, Props = new Dictionary<string, object> { { "Required", true } } },
+                                        new() { Type = "date", Span = 6, Label = "报修日期", FieldName = "repairDate", Props = new Dictionary<string, object> { { "Required", true } } },
+                                        new() { Type = "select", Span = 6, Label = "优先级", FieldName = "priority", DataSource = new CJDSL.Blazor.Models.DslDataSource { Type = "dictionary", Code = "priority" }, Props = new Dictionary<string, object> { { "Required", true } } },
+                                        new() { Type = "textarea", Span = 12, Label = "故障描述", FieldName = "faultDescription", Props = new Dictionary<string, object> { { "Required", true }, { "Lines", 4 }, { "MaxLength", 500 } } }
+                                    }
+                                },
+                                new() { Type = "divider", Props = new Dictionary<string, object> { { "Class", "my-4" } } },
+                                new()
+                                {
+                                    Type = "stack", Props = new Dictionary<string, object> { { "Row", true }, { "Justify", "flex-end" }, { "Spacing", 2 } },
+                                    Children = new List<CJDSL.Blazor.Models.DslComponent>
+                                    {
+                                        new() { Type = "button", Label = "重置", Props = new Dictionary<string, object> { { "Variant", "Outlined" }, { "Color", "Secondary" } }, Events = new List<CJDSL.Blazor.Models.DslEvent> { new() { Type = "onClick", Handler = "reset", Params = new Dictionary<string, object> { { "formId", "repairForm" } } } } },
+                                        new() { Type = "button", Label = "保存", Props = new Dictionary<string, object> { { "Variant", "Filled" }, { "Color", "Primary" } }, Events = new List<CJDSL.Blazor.Models.DslEvent> { new() { Type = "onClick", Handler = "showToast", Params = new Dictionary<string, object> { { "message", "保存成功" }, { "severity", "success" } } } } },
+                                        new() { Type = "button", Label = "提交", Props = new Dictionary<string, object> { { "Variant", "Filled" }, { "Color", "Tertiary" } }, Events = new List<CJDSL.Blazor.Models.DslEvent> { new() { Type = "onClick", Handler = "showToast", Params = new Dictionary<string, object> { { "message", "提交成功" }, { "severity", "success" } } } } }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    private CJDSL.Blazor.Models.DslPage BuildEquipmentListDsl()
+    {
+        return new CJDSL.Blazor.Models.DslPage
+        {
+            Id = "page_equipment_list",
+            Title = "设备列表",
+            Layout = "list",
+            Components = new List<CJDSL.Blazor.Models.DslComponent>
+            {
+                new()
+                {
+                    Type = "card",
+                    Children = new List<CJDSL.Blazor.Models.DslComponent>
+                    {
+                        new()
+                        {
+                            Type = "stack", Props = new Dictionary<string, object> { { "Row", true }, { "Spacing", 2 } },
+                            Children = new List<CJDSL.Blazor.Models.DslComponent>
+                            {
+                                new() { Type = "text", Props = new Dictionary<string, object> { { "Placeholder", "搜索设备" }, { "AdornmentIcon", "Search" } } },
+                                new() { Type = "button", Label = "查询", Props = new Dictionary<string, object> { { "Color", "Primary" }, { "StartIcon", "Search" } } },
+                                new() { Type = "button", Label = "新增", Props = new Dictionary<string, object> { { "Variant", "Outlined" }, { "StartIcon", "Add" } } }
+                            }
+                        },
+                        new()
+                        {
+                            Type = "table",
+                            Props = new Dictionary<string, object>
+                            {
+                                { "columns", new List<Dictionary<string, object>>
+                                    {
+                                        new() { { "title", "设备编号" }, { "dataIndex", "equipmentNo" } },
+                                        new() { { "title", "设备名称" }, { "dataIndex", "equipmentName" } },
+                                        new() { { "title", "设备类型" }, { "dataIndex", "equipmentType" } },
+                                        new() { { "title", "状态" }, { "dataIndex", "status" } },
+                                        new() { { "title", "操作" }, { "dataIndex", "actions" } }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+    }
+}

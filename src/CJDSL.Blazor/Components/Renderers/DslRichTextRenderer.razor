@@ -1,0 +1,188 @@
+@using CJDSL.Blazor.Models
+@using Microsoft.JSInterop
+@using MudBlazor
+
+<MudStack Class="@GetStringProp("Class")">
+    @if (!string.IsNullOrEmpty(Component.Label))
+    {
+        <MudText Typo="Typo.body1" Class="mb-1">@Component.Label</MudText>
+    }
+
+    <MudPaper Outlined="true" Class="rounded-lg">
+        @* Toolbar *@
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="pa-1 border-b mud-border-lines-default">
+            <MudTooltip Text="加粗">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatBold"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("bold"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+            <MudTooltip Text="斜体">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatItalic"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("italic"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+            <MudTooltip Text="下划线">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatUnderlined"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("underline"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+            <MudTooltip Text="删除线">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatStrikethrough"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("strikeThrough"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+
+            <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+
+            <MudTooltip Text="无序列表">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatListBulleted"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("insertUnorderedList"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+            <MudTooltip Text="有序列表">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatListNumbered"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("insertOrderedList"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+
+            <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+
+            <MudTooltip Text="左对齐">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatAlignLeft"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("justifyLeft"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+            <MudTooltip Text="居中">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatAlignCenter"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("justifyCenter"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+            <MudTooltip Text="右对齐">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatAlignRight"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("justifyRight"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+
+            <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+
+            <MudTooltip Text="插入链接">
+                <MudIconButton Icon="@Icons.Material.Filled.Link"
+                               Size="Size.Small"
+                               OnClick="@InsertLink"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+            <MudTooltip Text="引用">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatQuote"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("formatBlock", "blockquote"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+            <MudTooltip Text="代码块">
+                <MudIconButton Icon="@Icons.Material.Filled.Code"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("formatBlock", "pre"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+
+            <MudSpacer />
+
+            <MudTooltip Text="清除格式">
+                <MudIconButton Icon="@Icons.Material.Filled.FormatClear"
+                               Size="Size.Small"
+                               OnClick="@(() => ExecCommand("removeFormat"))"
+                               Disabled="@IsDisabled()" />
+            </MudTooltip>
+        </MudStack>
+
+        @* Editor Content *@
+        <div @ref="_editorRef"
+             id="@_editorId"
+             contenteditable="@(!IsDisabled())"
+             style="min-height: @(GetIntProp("MinHeight", 200))px; max-height: @(GetIntProp("MaxHeight", 600))px; overflow-y: auto; padding: 12px; outline: none; @GetStringProp("EditorStyle")"
+             class="mud-typography-body1"
+             @onblur="HandleBlur">
+        </div>
+    </MudPaper>
+
+    @if (GetBoolProp("ShowWordCount"))
+    {
+        <MudText Typo="Typo.caption" Color="Color.Default" Align="Align.Right">
+            @(_wordCount) 字
+        </MudText>
+    }
+</MudStack>
+
+@code {
+    [CascadingParameter] public DslRenderContext Context { get; set; } = null!;
+    [Parameter] public DslComponent Component { get; set; } = null!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
+    private ElementReference _editorRef;
+    private string _editorId = $"editor_{Guid.NewGuid():N}";
+    private int _wordCount;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var initialValue = Component.DataBind != null
+                ? Context.DataStore.GetString(Component.DataBind) ?? ""
+                : GetStringProp("DefaultValue", "");
+
+            if (!string.IsNullOrEmpty(initialValue))
+                await JSRuntime.InvokeVoidAsync("CJDSL.RichText.setContent", _editorId, initialValue);
+
+            await JSRuntime.InvokeVoidAsync("CJDSL.RichText.init", _editorId, DotNetObjectReference.Create(this));
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnContentChanged(string content)
+    {
+        _wordCount = content.Length;
+        if (Component.FieldName != null)
+            Context.DataStore.Set($"data.{Component.FieldName}", content);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ExecCommand(string command, string? value = null)
+    {
+        if (value != null)
+            await JSRuntime.InvokeVoidAsync("CJDSL.RichText.execCommand", _editorId, command, value);
+        else
+            await JSRuntime.InvokeVoidAsync("CJDSL.RichText.execCommand", _editorId, command);
+    }
+
+    private async Task InsertLink()
+    {
+        await JSRuntime.InvokeVoidAsync("CJDSL.RichText.execCommand", _editorId, "createLink", "https://");
+    }
+
+    private async Task HandleBlur()
+    {
+        var content = await JSRuntime.InvokeAsync<string>("CJDSL.RichText.getContent", _editorId);
+        if (Component.FieldName != null)
+            Context.DataStore.Set($"data.{Component.FieldName}", content);
+        _wordCount = content?.Length ?? 0;
+    }
+
+    private T? GetProp<T>(string key) => Component.Props?.GetValueOrDefault(key) is T v ? v : default;
+    private string? GetStringProp(string key, string? defaultValue = null) => Component.Props?.GetValueOrDefault(key) is string v ? v : defaultValue;
+    private int GetIntProp(string key, int defaultValue = 0) => Component.Props?.GetValueOrDefault(key) is int v ? v : defaultValue;
+    private bool GetBoolProp(string key) => Component.Props?.GetValueOrDefault(key) is bool v ? v : false;
+
+    private bool IsDisabled()
+    {
+        if (string.IsNullOrEmpty(Component.DisabledIf)) return false;
+        return Context.ExpressionEvaluator.Evaluate<bool>(Component.DisabledIf, Context.DataStore);
+    }
+}

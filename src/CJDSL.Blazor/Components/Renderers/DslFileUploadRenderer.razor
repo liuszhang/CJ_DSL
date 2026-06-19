@@ -1,0 +1,192 @@
+@using CJDSL.Blazor.Models
+@using Microsoft.JSInterop
+@using MudBlazor
+
+<MudStack Class="@GetStringProp("Class")">
+    @if (!string.IsNullOrEmpty(Component.Label))
+    {
+        <MudText Typo="Typo.body1" Class="mb-1">@Component.Label</MudText>
+    }
+
+    <InputFile id="@_inputId"
+               OnChange="HandleFileSelected"
+               accept="@GetStringProp("Accept")"
+               multiple="@GetBoolProp("Multiple")"
+               disabled="@_uploading"
+               style="display:none;" />
+
+    <MudPaper Outlined="true" Class="rounded-lg pa-4" Style="min-height:120px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-style:dashed !important;"
+              @onclick="OpenFilePicker">
+        <MudStack AlignItems="AlignItems.Center" Spacing="1">
+            <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Default" />
+            <MudText Typo="Typo.body1">
+                @(_selectedFiles == null || _selectedFiles.Count == 0
+                    ? GetStringProp("Placeholder", "点击选择文件")
+                    : $"{_selectedFiles.Count} 个文件已选择")
+            </MudText>
+            @if (!string.IsNullOrEmpty(GetStringProp("Hint")))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Default">
+                    @GetStringProp("Hint")
+                </MudText>
+            }
+        </MudStack>
+    </MudPaper>
+
+    @if (_selectedFiles != null && _selectedFiles.Count > 0)
+    {
+        <MudList T="string">
+            @foreach (var file in _selectedFiles)
+            {
+                <MudListItem T="string">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Style="width:100%">
+                        <MudIcon Icon="@GetFileIcon(file.Name)" Color="Color.Default" />
+                        <MudStack Style="flex:1; min-width:0">
+                            <MudText Typo="Typo.body2" Style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                @file.Name
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">
+                                @FormatFileSize(file.Size)
+                            </MudText>
+                        </MudStack>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => RemoveFile(file))" />
+                    </MudStack>
+                </MudListItem>
+            }
+        </MudList>
+
+        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2" Class="mt-2">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       OnClick="@ClearFiles"
+                       Disabled="@_uploading">
+                清除
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Upload"
+                       OnClick="@HandleUpload"
+                       Disabled="@_uploading">
+                @(_uploading ? "上传中..." : "上传")
+            </MudButton>
+        </MudStack>
+    }
+</MudStack>
+
+@code {
+    [CascadingParameter] public DslRenderContext Context { get; set; } = null!;
+    [Parameter] public DslComponent Component { get; set; } = null!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+    [Inject] private HttpClient HttpClient { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+
+    private readonly string _inputId = $"file_{Guid.NewGuid():N}";
+    private List<IBrowserFile>? _selectedFiles;
+    private bool _uploading;
+
+    private async Task OpenFilePicker()
+    {
+        await JSRuntime.InvokeVoidAsync("document.getElementById(_inputId).click()", _inputId);
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var maxFiles = GetIntProp("MaxFiles", 1);
+        _selectedFiles = e.GetMultipleFiles(maxFiles).ToList();
+        StateHasChanged();
+    }
+
+    private T? GetProp<T>(string key) => Component.Props?.GetValueOrDefault(key) is T v ? v : default;
+    private string? GetStringProp(string key, string? defaultValue = null) => Component.Props?.GetValueOrDefault(key) is string v ? v : defaultValue;
+    private int GetIntProp(string key, int defaultValue = 0) => Component.Props?.GetValueOrDefault(key) is int v ? v : defaultValue;
+    private bool GetBoolProp(string key) => Component.Props?.GetValueOrDefault(key) is bool v ? v : false;
+
+    private string GetFileIcon(string fileName)
+    {
+        var ext = System.IO.Path.GetExtension(fileName)?.ToLower() ?? "";
+        return ext switch
+        {
+            ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp" => Icons.Material.Filled.Image,
+            ".pdf" => Icons.Material.Filled.PictureAsPdf,
+            ".doc" or ".docx" => Icons.Material.Filled.Description,
+            ".xls" or ".xlsx" => Icons.Material.Filled.TableChart,
+            ".zip" or ".rar" or ".7z" => Icons.Material.Filled.FolderZip,
+            ".mp4" or ".avi" or ".mov" => Icons.Material.Filled.VideoFile,
+            ".mp3" or ".wav" => Icons.Material.Filled.AudioFile,
+            _ => Icons.Material.Filled.InsertDriveFile
+        };
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = ["B", "KB", "MB", "GB"];
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private void RemoveFile(IBrowserFile file)
+    {
+        _selectedFiles?.Remove(file);
+        StateHasChanged();
+    }
+
+    private void ClearFiles()
+    {
+        _selectedFiles = null;
+        StateHasChanged();
+    }
+
+    private async Task HandleUpload()
+    {
+        if (_selectedFiles == null || _selectedFiles.Count == 0) return;
+
+        _uploading = true;
+        StateHasChanged();
+
+        try
+        {
+            var endpoint = GetStringProp("UploadEndpoint", "/api/upload");
+            var maxFileSize = (long)GetIntProp("MaxFileSize", 10485760);
+
+            foreach (var file in _selectedFiles)
+            {
+                using var content = new MultipartFormDataContent();
+                using var stream = file.OpenReadStream(maxFileSize);
+                using var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
+                content.Add(fileContent, "file", file.Name);
+
+                var response = await HttpClient.PostAsync(endpoint, content);
+                if (response.IsSuccessStatusCode)
+                    Snackbar.Add($"{file.Name} 上传成功", Severity.Success);
+                else
+                    Snackbar.Add($"{file.Name} 上传失败", Severity.Error);
+            }
+
+            if (Component.FieldName != null)
+            {
+                Context.DataStore.Set($"data.{Component.FieldName}",
+                    _selectedFiles.Select(f => new { f.Name, f.Size, f.ContentType }).ToList());
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"上传失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _uploading = false;
+            _selectedFiles = null;
+            StateHasChanged();
+        }
+    }
+}

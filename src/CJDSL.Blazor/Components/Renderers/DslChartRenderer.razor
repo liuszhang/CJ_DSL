@@ -1,0 +1,215 @@
+@using CJDSL.Blazor.Models
+@using MudBlazor
+
+<MudStack Class="@GetStringProp("Class")">
+    @if (!string.IsNullOrEmpty(Component.Label))
+    {
+        <MudText Typo="Typo.h6" Class="mb-2">@Component.Label</MudText>
+    }
+
+    <MudPaper Outlined="true" Class="pa-4 rounded-lg">
+        @switch (GetChartType())
+        {
+            case "line":
+                <MudChart T="double"
+                          ChartType="ChartType.Line"
+                          ChartSeries="@_lineSeries"
+                          @bind-SelectedIndex="_selectedIndex"
+                          XAxisLabels="@_xAxisLabels"
+                          Width="100%"
+                          Height="@GetStringProp("Height", "350px")" />
+                break;
+
+            case "bar":
+                <MudChart T="double"
+                          ChartType="ChartType.Bar"
+                          ChartSeries="@_lineSeries"
+                          @bind-SelectedIndex="_selectedIndex"
+                          XAxisLabels="@_xAxisLabels"
+                          Width="100%"
+                          Height="@GetStringProp("Height", "350px")" />
+                break;
+
+            case "stackedbar":
+                <MudChart T="double"
+                          ChartType="ChartType.StackedBar"
+                          ChartSeries="@_lineSeries"
+                          @bind-SelectedIndex="_selectedIndex"
+                          XAxisLabels="@_xAxisLabels"
+                          Width="100%"
+                          Height="@GetStringProp("Height", "350px")" />
+                break;
+
+            case "donut":
+                <MudChart T="double"
+                          ChartType="ChartType.Donut"
+                          InputData="@_donutData"
+                          InputLabels="@_donutLabels"
+                          @bind-SelectedIndex="_selectedIndex"
+                          Width="@GetStringProp("Width", "300px")"
+                          Height="@GetStringProp("Height", "300px")" />
+                break;
+
+            case "pie":
+                <MudChart T="double"
+                          ChartType="ChartType.Pie"
+                          InputData="@_donutData"
+                          InputLabels="@_donutLabels"
+                          @bind-SelectedIndex="_selectedIndex"
+                          Width="@GetStringProp("Width", "300px")"
+                          Height="@GetStringProp("Height", "300px")" />
+                break;
+
+            default:
+                <MudChart T="double"
+                          ChartType="ChartType.Line"
+                          ChartSeries="@_lineSeries"
+                          @bind-SelectedIndex="_selectedIndex"
+                          XAxisLabels="@_xAxisLabels"
+                          Width="100%"
+                          Height="@GetStringProp("Height", "350px")" />
+                break;
+        }
+
+        @if (_selectedIndex >= 0)
+        {
+            <MudText Typo="Typo.body2" Class="mt-2" Align="Align.Center" Color="Color.Default">
+                @GetSelectedLabel(): @GetSelectedValue()
+            </MudText>
+        }
+    </MudPaper>
+
+    @if (GetBoolProp("ShowLegend") && GetChartType() != "donut" && GetChartType() != "pie")
+    {
+        <MudStack Row="true" Justify="Justify.Center" Spacing="4" Class="mt-2">
+            @for (int i = 0; i < _lineSeries.Count; i++)
+            {
+                var index = i;
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.Circle" Size="Size.Small"
+                             Color="@GetSeriesColor(index)" />
+                    <MudText Typo="Typo.caption">@_lineSeries[index].Name</MudText>
+                </MudStack>
+            }
+        </MudStack>
+    }
+</MudStack>
+
+@code {
+    [CascadingParameter] public DslRenderContext Context { get; set; } = null!;
+    [Parameter] public DslComponent Component { get; set; } = null!;
+
+    private List<ChartSeries<double>> _lineSeries = new();
+    private double[] _donutData = [];
+    private string[] _donutLabels = [];
+    private string[] _xAxisLabels = [];
+    private int _selectedIndex = -1;
+
+    protected override void OnInitialized() => LoadChartData();
+    protected override void OnParametersSet() => LoadChartData();
+
+    private void LoadChartData()
+    {
+        var chartType = GetChartType();
+        if (chartType == "donut" || chartType == "pie")
+            LoadPieData();
+        else
+            LoadSeriesData();
+    }
+
+    private void LoadSeriesData()
+    {
+        _lineSeries = new List<ChartSeries<double>>();
+        var seriesData = GetComponentProp<List<Dictionary<string, object>>>("Series");
+        var labels = GetComponentProp<List<string>>("Labels");
+        _xAxisLabels = labels?.ToArray() ?? Array.Empty<string>();
+
+        if (seriesData != null)
+        {
+            foreach (var series in seriesData)
+            {
+                var name = series.GetValueOrDefault("name")?.ToString() ?? "Series";
+                var data = series.GetValueOrDefault("data") as List<object>;
+                var values = data?.Select(d => Convert.ToDouble(d)).ToArray() ?? Array.Empty<double>();
+                _lineSeries.Add(new ChartSeries<double> { Name = name, Data = values });
+            }
+        }
+
+        if (_lineSeries.Count == 0 && Component.DataBind != null)
+        {
+            var data = Context.DataStore.Get(Component.DataBind ?? "");
+            if (data is List<Dictionary<string, object>> list)
+            {
+                _xAxisLabels = list.Select(d => d.GetValueOrDefault("label")?.ToString() ?? "").ToArray();
+                var values = list.Select(d => Convert.ToDouble(d.GetValueOrDefault("value") ?? 0)).ToArray();
+                _lineSeries.Add(new ChartSeries<double> { Name = Component.Label ?? "Data", Data = values });
+            }
+        }
+
+        if (_lineSeries.Count == 0)
+        {
+            var staticData = GetComponentProp<List<double>>("Data");
+            if (staticData != null)
+            {
+                _lineSeries.Add(new ChartSeries<double> { Name = Component.Label ?? "Data", Data = staticData.ToArray() });
+                if (_xAxisLabels.Length == 0)
+                    _xAxisLabels = staticData.Select((_, i) => (i + 1).ToString()).ToArray();
+            }
+        }
+    }
+
+    private void LoadPieData()
+    {
+        var pieData = GetComponentProp<List<Dictionary<string, object>>>("PieData");
+        if (pieData != null)
+        {
+            _donutLabels = pieData.Select(d => d.GetValueOrDefault("label")?.ToString() ?? "").ToArray();
+            _donutData = pieData.Select(d => Convert.ToDouble(d.GetValueOrDefault("value") ?? 0)).ToArray();
+        }
+        else
+        {
+            var data = Context.DataStore.Get(Component.DataBind ?? "");
+            if (data is List<Dictionary<string, object>> list)
+            {
+                _donutLabels = list.Select(d => d.GetValueOrDefault("label")?.ToString() ?? "").ToArray();
+                _donutData = list.Select(d => Convert.ToDouble(d.GetValueOrDefault("value") ?? 0)).ToArray();
+            }
+        }
+    }
+
+    private string GetChartType() => GetStringProp("ChartType", "line")?.ToLower() ?? "line";
+
+    private Color GetSeriesColor(int index) => index switch
+    {
+        0 => Color.Primary, 1 => Color.Secondary, 2 => Color.Tertiary,
+        3 => Color.Info, 4 => Color.Success, 5 => Color.Warning,
+        6 => Color.Error, _ => Color.Default
+    };
+
+    private string GetSelectedLabel()
+    {
+        var chartType = GetChartType();
+        if (chartType == "donut" || chartType == "pie")
+            return _selectedIndex >= 0 && _selectedIndex < _donutLabels.Length ? _donutLabels[_selectedIndex] : "";
+        return _selectedIndex >= 0 && _selectedIndex < _xAxisLabels.Length ? _xAxisLabels[_selectedIndex] : "";
+    }
+
+    private string GetSelectedValue()
+    {
+        var chartType = GetChartType();
+        if (chartType == "donut" || chartType == "pie")
+            return _selectedIndex >= 0 && _selectedIndex < _donutData.Length ? _donutData[_selectedIndex].ToString() : "";
+        if (_lineSeries.Count > 0 && _selectedIndex >= 0)
+        {
+            var series = _lineSeries[0];
+            var arr = series.Data.ToArray();
+            if (_selectedIndex < arr.Length)
+                return arr[_selectedIndex].ToString();
+        }
+        return "";
+    }
+
+    private T? GetComponentProp<T>(string key) => Component.Props?.GetValueOrDefault(key) is T v ? v : default;
+    private string? GetStringProp(string key, string? defaultValue = null) => Component.Props?.GetValueOrDefault(key) is string v ? v : defaultValue;
+    private bool GetBoolProp(string key) => Component.Props?.GetValueOrDefault(key) is bool v ? v : false;
+}
