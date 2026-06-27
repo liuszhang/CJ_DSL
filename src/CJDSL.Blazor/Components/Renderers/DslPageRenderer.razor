@@ -9,7 +9,24 @@
 @inject IDialogService DialogService
 @inject HttpClient HttpClient
 
-@if (DslPage != null)
+@if (_isLoading)
+{
+    <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <MudText Typo="Typo.body1" Class="mt-4">加载中...</MudText>
+    </MudStack>
+}
+else if (_errorMessage != null)
+{
+    <MudAlert Severity="Severity.Error" Class="ma-4">
+        <MudText Typo="Typo.h6">加载失败</MudText>
+        <MudText Typo="Typo.body2">@_errorMessage</MudText>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="RetryLoad" Class="mt-2">
+            重试
+        </MudButton>
+    </MudAlert>
+}
+else if (DslPage != null)
 {
     <CascadingValue Value="_context">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
@@ -22,8 +39,9 @@
 }
 else
 {
-    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
-    <MudText Typo="Typo.body1" Class="mt-4">加载中...</MudText>
+    <MudAlert Severity="Severity.Warning" Class="ma-4">
+        无法加载 DSL 页面
+    </MudAlert>
 }
 
 @code {
@@ -33,29 +51,47 @@ else
 
     private DslRenderContext _context = null!;
     private DslEventDispatcher _dispatcher = null!;
+    private bool _isLoading = false;
+    private string? _errorMessage = null;
 
     protected override void OnParametersSet()
     {
         if (DslPage != null)
         {
-            _context = new DslRenderContext
-            {
-                Page = DslPage,
-                User = User ?? new UserContext(),
-                ExpressionEvaluator = new ClientJintEvaluator()
-            };
+            _errorMessage = null;
+            _isLoading = false;
 
-            _dispatcher = new DslEventDispatcher(
-                HttpClient, Snackbar, Navigation, DialogService, JSRuntime);
-
-            if (InitialData != null)
+            try
             {
-                foreach (var kv in InitialData)
-                    _context.DataStore.Set($"data.{kv.Key}", kv.Value);
+                _context = new DslRenderContext
+                {
+                    Page = DslPage,
+                    User = User ?? new UserContext(),
+                    ExpressionEvaluator = new ClientJintEvaluator()
+                };
+
+                _dispatcher = new DslEventDispatcher(
+                    HttpClient, Snackbar, Navigation, DialogService, JSRuntime);
+
+                if (InitialData != null)
+                {
+                    foreach (var kv in InitialData)
+                        _context.DataStore.Set($"data.{kv.Key}", kv.Value);
+                }
+
+                _context.DataStore.DataChanged += (s, e) => StateHasChanged();
             }
-
-            // 监听数据变化
-            _context.DataStore.DataChanged += (s, e) => StateHasChanged();
+            catch (Exception ex)
+            {
+                _errorMessage = $"初始化渲染上下文失败: {ex.Message}";
+                Snackbar.Add(_errorMessage, Severity.Error);
+            }
         }
+    }
+
+    private void RetryLoad()
+    {
+        _errorMessage = null;
+        StateHasChanged();
     }
 }

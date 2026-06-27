@@ -1,9 +1,9 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CJDSL.Domain.Configuration;
 using CJDSL.Domain.Interfaces;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace CJDSL.Infrastructure.LLM;
 
@@ -13,27 +13,24 @@ namespace CJDSL.Infrastructure.LLM;
 public class OpenAIClient : ILLMClient
 {
     private readonly HttpClient _httpClient;
-    private readonly LLMConfig _config;
+    private readonly LlmProviderConfig _providerConfig;
     private readonly ILogger<OpenAIClient> _logger;
 
     public string Provider => "OpenAI";
 
-    public OpenAIClient(
-        HttpClient httpClient,
-        IOptions<LLMConfig> config,
-        ILogger<OpenAIClient> logger)
+    public OpenAIClient(HttpClient httpClient, LlmProviderConfig providerConfig, ILogger<OpenAIClient> logger)
     {
         _httpClient = httpClient;
-        _config = config.Value;
+        _providerConfig = providerConfig;
         _logger = logger;
 
-        _httpClient.BaseAddress = new Uri(_config.BaseUrl.TrimEnd('/') + "/");
-        _httpClient.Timeout = TimeSpan.FromSeconds(_config.DefaultTimeoutSeconds);
+        _httpClient.BaseAddress = new Uri(providerConfig.BaseUrl.TrimEnd('/') + "/");
+        _httpClient.Timeout = TimeSpan.FromSeconds(providerConfig.TimeoutSeconds);
 
-        if (!string.IsNullOrEmpty(_config.ApiKey))
+        if (!string.IsNullOrEmpty(providerConfig.ApiKey))
         {
             _httpClient.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", _config.ApiKey);
+                new AuthenticationHeaderValue("Bearer", providerConfig.ApiKey);
         }
     }
 
@@ -46,7 +43,7 @@ public class OpenAIClient : ILLMClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "OpenAI 服务可用性检查失败");
+            _logger.LogWarning(ex, "OpenAI service availability check failed for {Name}", _providerConfig.Name);
             return false;
         }
     }
@@ -63,7 +60,7 @@ public class OpenAIClient : ILLMClient
             {
                 var payload = new
                 {
-                    model = _config.Model,
+                    model = _providerConfig.Model,
                     messages = new[]
                     {
                         new { role = "system", content = request.SystemPrompt },
@@ -83,20 +80,18 @@ public class OpenAIClient : ILLMClient
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("OpenAI API 错误: {StatusCode} - {Body}", response.StatusCode, responseBody);
+                    _logger.LogError("OpenAI API error: {StatusCode} - {Body}", response.StatusCode, responseBody);
                     return new LLMResponse
                     {
                         IsSuccess = false,
-                        ErrorMessage = $"API 错误: {response.StatusCode} - {responseBody}",
+                        ErrorMessage = $"API error: {response.StatusCode} - {responseBody}",
                         Provider = Provider,
-                        Model = _config.Model
+                        Model = _providerConfig.Model
                     };
                 }
 
                 var result = JsonSerializer.Deserialize<OpenAIChatCompletion>(responseBody);
                 var rawText = result?.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
-
-                // 清理 JSON 代码块标记
                 rawText = CleanJsonResponse(rawText);
 
                 JsonElement? parsed = null;
@@ -113,13 +108,13 @@ public class OpenAIClient : ILLMClient
                     CompletionTokens = result?.Usage?.CompletionTokens,
                     ElapsedMs = sw.ElapsedMilliseconds,
                     Provider = Provider,
-                    Model = _config.Model
+                    Model = _providerConfig.Model
                 };
             }
             catch (Exception ex) when (attempt < maxRetries)
             {
                 lastException = ex;
-                _logger.LogWarning(ex, "OpenAI 请求失败，第 {Attempt} 次重试...", attempt + 1);
+                _logger.LogWarning(ex, "OpenAI request failed, retry {Attempt}...", attempt + 1);
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), ct);
             }
         }
@@ -128,9 +123,9 @@ public class OpenAIClient : ILLMClient
         return new LLMResponse
         {
             IsSuccess = false,
-            ErrorMessage = $"请求失败（重试 {maxRetries} 次）: {lastException?.Message}",
+            ErrorMessage = $"Request failed (retried {maxRetries} times): {lastException?.Message}",
             Provider = Provider,
-            Model = _config.Model,
+            Model = _providerConfig.Model,
             ElapsedMs = sw.ElapsedMilliseconds
         };
     }
@@ -141,7 +136,7 @@ public class OpenAIClient : ILLMClient
     {
         var payload = new
         {
-            model = _config.Model,
+            model = _providerConfig.Model,
             messages = new[]
             {
                 new { role = "system", content = request.SystemPrompt },
@@ -168,11 +163,7 @@ public class OpenAIClient : ILLMClient
             if (data == "[DONE]") break;
 
             OpenAIStreamChunk? chunk = null;
-            try
-            {
-                chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(data);
-            }
-            catch { /* ignore malformed chunks */ }
+            try { chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(data); } catch { }
 
             var content = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
             if (!string.IsNullOrEmpty(content)) yield return content;
@@ -183,7 +174,6 @@ public class OpenAIClient : ILLMClient
     {
         if (string.IsNullOrWhiteSpace(rawText)) return rawText;
         rawText = rawText.Trim();
-        // 移除 Markdown 代码块标记
         if (rawText.StartsWith("```json")) rawText = rawText["```json".Length..];
         if (rawText.StartsWith("```")) rawText = rawText[3..];
         if (rawText.EndsWith("```")) rawText = rawText[..^3];
@@ -191,7 +181,6 @@ public class OpenAIClient : ILLMClient
     }
 }
 
-// OpenAI API 响应模型
 #pragma warning disable CS8618
 public class OpenAIChatCompletion
 {

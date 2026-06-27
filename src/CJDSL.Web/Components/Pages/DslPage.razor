@@ -2,26 +2,48 @@
 @rendermode RenderMode.InteractiveServer
 @inject HttpClient HttpClient
 @inject ISnackbar Snackbar
+@inject DslRendererRegistry RendererRegistry
 
 <MudText Typo="Typo.h4" Class="mb-4">DSL 页面: @PageCode</MudText>
 
 @if (_loading)
 {
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+    <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <MudText Typo="Typo.body1" Class="mt-4">正在加载 DSL 页面...</MudText>
+    </MudStack>
+}
+else if (_errorMessage != null)
+{
+    <MudAlert Severity="Severity.Error" Class="ma-4">
+        <MudText Typo="Typo.h6">加载失败</MudText>
+        <MudText Typo="Typo.body2">@_errorMessage</MudText>
+        <MudStack Row="true" Spacing="2" Class="mt-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="RetryLoad">
+                重试
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="GoHome">
+                返回首页
+            </MudButton>
+        </MudStack>
+    </MudAlert>
 }
 else if (_dslPage != null)
 {
-    <DslPageRenderer DslPage="_dslPage" User="_user" />
+    <DslPageRenderer DslPage="_dslPage" User="_user" RendererRegistry="RendererRegistry" />
 }
 else
 {
-    <MudAlert Severity="Severity.Error">无法加载 DSL 页面: @PageCode</MudAlert>
+    <MudAlert Severity="Severity.Warning">
+        无法加载 DSL 页面: @PageCode
+    </MudAlert>
 }
 
 @code {
     [Parameter] public string PageCode { get; set; } = string.Empty;
 
     private bool _loading = true;
+    private string? _errorMessage = null;
     private CJDSL.Blazor.Models.DslPage? _dslPage;
     private CJDSL.Blazor.Models.UserContext _user = new()
     {
@@ -38,12 +60,18 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        await LoadDslPage();
+        if (_dslPage?.Id != PageCode)
+        {
+            await LoadDslPage();
+        }
     }
 
     private async Task LoadDslPage()
     {
         _loading = true;
+        _errorMessage = null;
+        _dslPage = null;
+
         try
         {
             var response = await HttpClient.GetAsync($"api/dsl/page/{PageCode}");
@@ -54,22 +82,56 @@ else
                 {
                     PropertyNameCaseInsensitive = true
                 });
+
+                if (_dslPage == null)
+                {
+                    _errorMessage = "DSL 页面数据解析失败，请检查页面配置";
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _errorMessage = $"页面 '{PageCode}' 不存在";
+                _dslPage = await GetFallbackDslPage(PageCode);
+                if (_dslPage != null) _errorMessage = null;
             }
             else
             {
+                _errorMessage = $"服务器返回错误: {(int)response.StatusCode} {response.ReasonPhrase}";
                 _dslPage = await GetFallbackDslPage(PageCode);
+                if (_dslPage != null) _errorMessage = null;
             }
+        }
+        catch (TaskCanceledException)
+        {
+            _errorMessage = "请求超时，请检查网络连接后重试";
+        }
+        catch (HttpRequestException ex)
+        {
+            _errorMessage = $"网络请求失败: {ex.Message}";
+            _dslPage = await GetFallbackDslPage(PageCode);
+            if (_dslPage != null) _errorMessage = null;
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"加载 DSL 失败: {ex.Message}", Severity.Error);
-            _dslPage = await GetFallbackDslPage(PageCode);
+            _errorMessage = $"加载 DSL 页面时发生未知错误: {ex.Message}";
         }
         finally
         {
             _loading = false;
         }
     }
+
+    private void RetryLoad()
+    {
+        _ = LoadDslPage();
+    }
+
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
 
     private async Task<CJDSL.Blazor.Models.DslPage?> GetFallbackDslPage(string pageCode)
     {

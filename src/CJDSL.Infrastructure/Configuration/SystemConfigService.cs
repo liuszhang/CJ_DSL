@@ -61,6 +61,24 @@ public class SystemConfigService
         ConfigChanged?.Invoke();
     }
 
+    public DslPromptConfig GetDslPromptConfig()
+    {
+        lock (_lock)
+        {
+            return _config.DslPrompt;
+        }
+    }
+
+    public void UpdateDslPromptConfig(DslPromptConfig prompt)
+    {
+        lock (_lock)
+        {
+            _config.DslPrompt = prompt;
+            SaveConfig();
+        }
+        ConfigChanged?.Invoke();
+    }
+
     public void UpdateOntologyConfig(OntologySourceConfig ontology)
     {
         lock (_lock)

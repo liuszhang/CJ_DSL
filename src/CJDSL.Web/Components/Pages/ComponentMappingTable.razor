@@ -1,0 +1,69 @@
+@using MudBlazor
+
+<MudTable T="ComponentInfo" Items="Components" Hover="true" Striped="true" Dense="true"
+          Filter="FilterFunc" @bind-SelectedItem="_selectedItem">
+    <ToolBarContent>
+        <MudTextField T="string" @bind-Value="_searchString" Placeholder="搜索组件类型..."
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Small" Class="mt-0" />
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>DSL 类型</MudTh>
+        <MudTh>MudBlazor 组件</MudTh>
+        <MudTh>说明</MudTh>
+        <MudTh>支持的 Props</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="DSL 类型">
+            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                @context.DslType
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="MudBlazor 组件">
+            <code style="font-size: 13px;">@context.MudComponent</code>
+        </MudTd>
+        <MudTd DataLabel="说明">@context.Description</MudTd>
+        <MudTd DataLabel="Props">
+            <MudText Typo="Typo.body2" Style="font-size: 12px;" Class="mud-text-secondary">
+                @context.Props
+            </MudText>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Class="pa-4">未找到匹配的组件</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    [Parameter] public List<ComponentInfo> Components { get; set; } = new();
+
+    private string _searchString = "";
+    private ComponentInfo? _selectedItem;
+
+    private bool FilterFunc(ComponentInfo element)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString)) return true;
+        return element.DslType.Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+            || element.MudComponent.Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+            || element.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+            || element.Props.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public class ComponentInfo
+    {
+        public string DslType { get; set; } = "";
+        public string MudComponent { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Props { get; set; } = "";
+
+        public ComponentInfo() { }
+
+        public ComponentInfo(string dslType, string mudComponent, string description, string props)
+        {
+            DslType = dslType;
+            MudComponent = mudComponent;
+            Description = description;
+            Props = props;
+        }
+    }
+}

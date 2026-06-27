@@ -1,6 +1,8 @@
 using System.Text.Json;
 using CJDSL.Domain;
+using CJDSL.Domain.Configuration;
 using CJDSL.Domain.Entities.MetaModel;
+using CJDSL.Infrastructure.Configuration;
 
 namespace CJDSL.Infrastructure.LLM;
 
@@ -17,57 +19,32 @@ public interface IDslPromptBuilder
 
 public class DslPromptBuilder : IDslPromptBuilder
 {
+    private readonly SystemConfigService _configService;
+
+    public DslPromptBuilder(SystemConfigService configService)
+    {
+        _configService = configService;
+    }
+
+    private DslPromptConfig GetConfig() => _configService.GetDslPromptConfig();
+
     public string BuildSystemPrompt()
     {
-        return @"
-你是一位精通 CJDSL Schema v2 的前端架构师和 DSL 设计师。
-你的任务是根据提供的业务元模型或自然语言描述，生成一份合法的 CJDSL JSON。
+        var config = GetConfig();
+        if (!string.IsNullOrWhiteSpace(config.SystemPrompt))
+            return config.SystemPrompt;
 
-## CJDSL Schema 规范
-
-### DslPage 结构
-{
-  ""id"": ""string"",
-  ""title"": ""string"",
-  ""description"": ""string"",
-  ""layout"": ""form|list|detail|dashboard|custom"",
-  ""components"": [ DslComponent ],
-  ""dataSource"": { ... },
-  ""permission"": { ""requiredRoles"": [], ""requiredPermissions"": [] },
-  ""style"": { ... }
-}
-
-### DslComponent 结构
-{
-  ""id"": ""string"",
-  ""type"": ""text|number|select|date|textarea|switch|button|card|form|grid|stack|table|divider|textDisplay|..."",
-  ""label"": ""string"",
-  ""fieldName"": ""string"",
-  ""dataBind"": ""@data.fieldName"",
-  ""span"": 12,
-  ""visibleIf"": ""expression"",
-  ""disabledIf"": ""expression"",
-  ""props"": { },
-  ""children"": [ DslComponent ],
-  ""events"": [ { ""type"": ""onClick|onChange|onSubmit"", ""handler"": ""submit|apiCall|navigate|showToast|chain|reset|validate"", ""params"": { } } ],
-  ""validationRules"": [ { ""type"": ""required|regex|minLength|maxLength|email|custom"", ""message"": ""string"" } ],
-  ""dataSource"": { ""type"": ""dictionary|enum|api|static"", ""code"": ""string"" }
-}
-
-### 重要规则
-1. 使用 MudBlazor 的 Props 命名（PascalCase）：Required, ReadOnly, Variant, Color, Elevation, Class, Placeholder, AdornmentIcon, Lines, MaxLength
-2. 表单组件 span: 桌面端每行 2 列用 6，移动端 1 列用 12
-3. Grid 布局组件 type: ""grid""，子组件用 span 属性
-4. Stack 布局组件 type: ""stack""，props: { ""Row"": true, ""Justify"": ""flex-end"", ""Spacing"": 2 }
-5. 条件渲染表达式使用 JavaScript 语法，如 ""user.roles.includes('admin')""
-6. 按钮事件 handler 必须是预定义值：submit, apiCall, navigate, showToast, chain, reset, validate
-7. 输出必须是纯 JSON，不要包含任何 Markdown 标记或解释文字
-8. 组件 type 必须是以下合法值之一：text, number, select, date, datetime, textarea, switch, checkbox, radio, file, button, iconButton, card, form, grid, stack, table, dataGrid, list, tabs, stepper, divider, textDisplay, paper, avatar, chip, badge, tooltip, skeleton, pagination, tree, progress, chart, markdown, codeBlock, jsonEditor, richText, calendar, map, iframe, custom
-";
+        return DefaultSystemPrompt;
     }
 
     public string BuildFormPrompt(M1_Object metaObject, GenerateOptions options)
     {
+        var config = GetConfig();
+        if (!string.IsNullOrWhiteSpace(config.FormPromptTemplate))
+        {
+            return ApplyFormPlaceholders(config.FormPromptTemplate, metaObject, options);
+        }
+
         var properties = string.Join("\n", metaObject.Properties.Select(p =>
             $"- {p.Name} ({p.Code}): 类型={p.Type}, 必填={p.Required}, 字典={p.DictCode ?? "无"}, 长度={p.Length?.ToString() ?? "N/A"}, 描述={p.Description}"));
 
@@ -117,6 +94,12 @@ public class DslPromptBuilder : IDslPromptBuilder
 
     public string BuildListPrompt(M1_Object metaObject, GenerateOptions options)
     {
+        var config = GetConfig();
+        if (!string.IsNullOrWhiteSpace(config.ListPromptTemplate))
+        {
+            return ApplyFormPlaceholders(config.ListPromptTemplate, metaObject, options);
+        }
+
         var columns = string.Join("\n", metaObject.Properties.Take(8).Select(p =>
             $"- {p.Name} ({p.Code})"));
 
@@ -146,6 +129,16 @@ public class DslPromptBuilder : IDslPromptBuilder
 
     public string BuildNlpPrompt(string description, UserContext user, GenerateOptions options)
     {
+        var config = GetConfig();
+        if (!string.IsNullOrWhiteSpace(config.NlpPromptTemplate))
+        {
+            var template = config.NlpPromptTemplate;
+            template = template.Replace("{描述}", description);
+            template = template.Replace("{角色}", string.Join(", ", user.Roles));
+            template = template.Replace("{设备}", options.DeviceType);
+            return template;
+        }
+
         return $@"
 根据以下自然语言描述，生成一份 CJDSL JSON。
 
@@ -164,4 +157,68 @@ public class DslPromptBuilder : IDslPromptBuilder
 5. 输出必须是纯 JSON
 ";
     }
+
+    private static string ApplyFormPlaceholders(string template, M1_Object metaObject, GenerateOptions options)
+    {
+        var properties = string.Join("\n", metaObject.Properties.Select(p =>
+            $"- {p.Name} ({p.Code}): 类型={p.Type}, 必填={p.Required}, 字典={p.DictCode ?? "无"}"));
+        var states = string.Join("\n", metaObject.LifeCycleStates.Select(s =>
+            $"- {s.Name} ({s.Code}): 起始={s.IsStart}, 终止={s.IsEnd}"));
+
+        template = template.Replace("{对象名称}", metaObject.Name);
+        template = template.Replace("{对象编码}", metaObject.Code);
+        template = template.Replace("{描述}", metaObject.Description);
+        template = template.Replace("{属性列表}", properties);
+        template = template.Replace("{状态列表}", states);
+        template = template.Replace("{角色}", string.Join(", ", options.Roles));
+        template = template.Replace("{设备}", options.DeviceType);
+        template = template.Replace("{密度}", options.Preference.Density);
+        return template;
+    }
+
+    public const string DefaultSystemPrompt = @"
+你是一位精通 CJDSL Schema v2 的前端架构师和 DSL 设计师。
+你的任务是根据提供的业务元模型或自然语言描述，生成一份合法的 CJDSL JSON。
+
+## CJDSL Schema 规范
+
+### DslPage 结构
+{
+  ""id"": ""string"",
+  ""title"": ""string"",
+  ""description"": ""string"",
+  ""layout"": ""form|list|detail|dashboard|custom"",
+  ""components"": [ DslComponent ],
+  ""dataSource"": { ... },
+  ""permission"": { ""requiredRoles"": [], ""requiredPermissions"": [] },
+  ""style"": { ... }
+}
+
+### DslComponent 结构
+{
+  ""id"": ""string"",
+  ""type"": ""text|number|select|date|textarea|switch|button|card|form|grid|stack|table|divider|textDisplay|..."",
+  ""label"": ""string"",
+  ""fieldName"": ""string"",
+  ""dataBind"": ""@data.fieldName"",
+  ""span"": 12,
+  ""visibleIf"": ""expression"",
+  ""disabledIf"": ""expression"",
+  ""props"": { },
+  ""children"": [ DslComponent ],
+  ""events"": [ { ""type"": ""onClick|onChange|onSubmit"", ""handler"": ""submit|apiCall|navigate|showToast|chain|reset|validate"", ""params"": { } } ],
+  ""validationRules"": [ { ""type"": ""required|regex|minLength|maxLength|email|custom"", ""message"": ""string"" } ],
+  ""dataSource"": { ""type"": ""dictionary|enum|api|static"", ""code"": ""string"" }
+}
+
+### 重要规则
+1. 使用 MudBlazor 的 Props 命名（PascalCase）：Required, ReadOnly, Variant, Color, Elevation, Class, Placeholder, AdornmentIcon, Lines, MaxLength
+2. 表单组件 span: 桌面端每行 2 列用 6，移动端 1 列用 12
+3. Grid 布局组件 type: ""grid""，子组件用 span 属性
+4. Stack 布局组件 type: ""stack""，props: { ""Row"": true, ""Justify"": ""flex-end"", ""Spacing"": 2 }
+5. 条件渲染表达式使用 JavaScript 语法，如 ""user.roles.includes('admin')""
+6. 按钮事件 handler 必须是预定义值：submit, apiCall, navigate, showToast, chain, reset, validate
+7. 输出必须是纯 JSON，不要包含任何 Markdown 标记或解释文字
+8. 组件 type 必须是以下合法值之一：text, number, select, date, datetime, textarea, switch, checkbox, radio, file, button, iconButton, card, form, grid, stack, table, dataGrid, list, tabs, stepper, divider, textDisplay, paper, avatar, chip, badge, tooltip, skeleton, pagination, tree, progress, chart, markdown, codeBlock, jsonEditor, richText, calendar, map, iframe, custom
+";
 }

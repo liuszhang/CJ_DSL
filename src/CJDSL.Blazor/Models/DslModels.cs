@@ -35,6 +35,7 @@ public class DslDataStore
 
     public object? Get(string path)
     {
+        if (string.IsNullOrEmpty(path)) return null;
         if (path.StartsWith('@')) path = path[1..];
         var segments = path.Split('.');
         var current = _data.GetValueOrDefault(segments[0]);

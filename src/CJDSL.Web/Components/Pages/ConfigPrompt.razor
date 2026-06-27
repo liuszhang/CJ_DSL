@@ -1,0 +1,201 @@
+@page "/config/prompt"
+@rendermode RenderMode.InteractiveServer
+@using CJDSL.Domain.Configuration
+@using CJDSL.Infrastructure.Configuration
+@using CJDSL.Infrastructure.LLM
+@inject SystemConfigService ConfigService
+@inject ISnackbar Snackbar
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.Code" Class="mr-2" />提示词配置
+    </MudText>
+    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@RestoreDefaults"
+               StartIcon="@Icons.Material.Filled.Restore">
+        恢复系统默认
+    </MudButton>
+</MudStack>
+
+<MudPaper Class="pa-6" Outlined="true">
+    <MudText Typo="Typo.h6" Class="mb-2">DSL 生成提示词</MudText>
+    <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+        直接编辑下方提示词内容，保存后立即生效。
+    </MudText>
+
+    <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
+        支持占位符：{对象名称}、{对象编码}、{属性列表}、{状态列表}、{角色}、{设备}、{密度}、{描述}
+    </MudAlert>
+
+    <MudTabs>
+        <MudTabPanel Text="系统提示词" Icon="@Icons.Material.Filled.SmartToy">
+            <MudText Typo="Typo.body2" Class="mb-2 mud-text-secondary">
+                定义 LLM 角色和 CJDSL Schema 规范，所有生成请求都会携带此提示词。
+            </MudText>
+            <MudTextField T="string" @bind-Value="_systemPrompt"
+                          Variant="Variant.Outlined"
+                          Lines="20"
+                          Class="font-monospace" />
+        </MudTabPanel>
+
+        <MudTabPanel Text="表单生成" Icon="@Icons.Material.Filled.EditNote">
+            <MudText Typo="Typo.body2" Class="mb-2 mud-text-secondary">
+                从元模型生成表单 DSL 时使用的提示词模板。
+            </MudText>
+            <MudTextField T="string" @bind-Value="_formPrompt"
+                          Variant="Variant.Outlined"
+                          Lines="20"
+                          Class="font-monospace" />
+        </MudTabPanel>
+
+        <MudTabPanel Text="列表生成" Icon="@Icons.Material.Filled.TableChart">
+            <MudText Typo="Typo.body2" Class="mb-2 mud-text-secondary">
+                从元模型生成列表 DSL 时使用的提示词模板。
+            </MudText>
+            <MudTextField T="string" @bind-Value="_listPrompt"
+                          Variant="Variant.Outlined"
+                          Lines="20"
+                          Class="font-monospace" />
+        </MudTabPanel>
+
+        <MudTabPanel Text="自然语言生成" Icon="@Icons.Material.Filled.Chat">
+            <MudText Typo="Typo.body2" Class="mb-2 mud-text-secondary">
+                从自然语言描述生成 DSL 时使用的提示词模板。
+            </MudText>
+            <MudTextField T="string" @bind-Value="_nlpPrompt"
+                          Variant="Variant.Outlined"
+                          Lines="20"
+                          Class="font-monospace" />
+        </MudTabPanel>
+    </MudTabs>
+
+    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2" Class="mt-4">
+        <MudButton Variant="Variant.Outlined" OnClick="@RestoreDefaults"
+                   StartIcon="@Icons.Material.Filled.Restore">
+            恢复默认
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveConfig"
+                   StartIcon="@Icons.Material.Filled.Save">
+            保存配置
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private string _systemPrompt = "";
+    private string _formPrompt = "";
+    private string _listPrompt = "";
+    private string _nlpPrompt = "";
+
+    protected override void OnInitialized()
+    {
+        var config = ConfigService.GetDslPromptConfig();
+        _systemPrompt = string.IsNullOrWhiteSpace(config.SystemPrompt) ? DslPromptBuilder.DefaultSystemPrompt : config.SystemPrompt;
+        _formPrompt = string.IsNullOrWhiteSpace(config.FormPromptTemplate) ? DefaultFormPrompt : config.FormPromptTemplate;
+        _listPrompt = string.IsNullOrWhiteSpace(config.ListPromptTemplate) ? DefaultListPrompt : config.ListPromptTemplate;
+        _nlpPrompt = string.IsNullOrWhiteSpace(config.NlpPromptTemplate) ? DefaultNlpPrompt : config.NlpPromptTemplate;
+    }
+
+    private void SaveConfig()
+    {
+        ConfigService.UpdateDslPromptConfig(new DslPromptConfig
+        {
+            SystemPrompt = _systemPrompt,
+            FormPromptTemplate = _formPrompt,
+            ListPromptTemplate = _listPrompt,
+            NlpPromptTemplate = _nlpPrompt
+        });
+        Snackbar.Add("提示词配置已保存", Severity.Success);
+    }
+
+    private void RestoreDefaults()
+    {
+        _systemPrompt = DslPromptBuilder.DefaultSystemPrompt;
+        _formPrompt = DefaultFormPrompt;
+        _listPrompt = DefaultListPrompt;
+        _nlpPrompt = DefaultNlpPrompt;
+
+        ConfigService.UpdateDslPromptConfig(new DslPromptConfig());
+        Snackbar.Add("已恢复系统默认提示词", Severity.Success);
+    }
+
+    private const string DefaultFormPrompt = @"
+根据以下业务对象元模型，生成一份表单布局的 CJDSL JSON。
+
+## 业务对象信息
+- 对象名称：{对象名称}
+- 对象编码：{对象编码}
+- 描述：{描述}
+
+## 属性列表
+{属性列表}
+
+## 生命周期状态
+{状态列表}
+
+## 用户上下文
+- 角色：{角色}
+- 设备：{设备}
+- 布局偏好：{密度}
+
+## 生成要求
+1. layout: ""form""
+2. 最外层使用 card 组件包裹
+3. 内部使用 form 组件包含字段
+4. 字段使用 grid 布局，每行 2 列（桌面端），每列 span=6
+5. 根据字段类型选择合适的组件类型：
+   - string -> text
+   - number -> number
+   - date -> date
+   - select -> select（配置 DataSource 指向字典编码）
+   - textarea -> textarea
+   - boolean -> switch
+6. 必填字段配置 Required=true 和 validationRules（required 类型）
+7. 有字典编码的字段配置 DataSource type=dictionary
+8. 表单底部添加按钮区域（stack Row=true Justify=flex-end）：
+   - 重置按钮：handler=reset, params formId=formId
+   - 保存按钮：handler=submit, params endpoint=/api/{对象编码}/save
+   - 提交按钮：handler=chain, 包含 validate + apiCall + showToast + navigate
+9. 输出必须是纯 JSON，不要包含 Markdown 代码块标记
+";
+
+    private const string DefaultListPrompt = @"
+根据以下业务对象，生成一份列表布局的 CJDSL JSON。
+
+## 业务对象信息
+- 对象名称：{对象名称}
+- 对象编码：{对象编码}
+
+## 列表列（取前 8 个属性）
+{属性列表}
+
+## 生成要求
+1. layout: ""list""
+2. 包含搜索区域（stack Row=true）：
+   - 搜索输入框（text，Placeholder=搜索）
+   - 查询按钮（button，Color=Primary）
+   - 新增按钮（button，Variant=Outlined）
+3. 表格区域（table 组件）：
+   - columns 配置为上述列
+   - rowKey=id
+   - pagination=true
+4. 输出必须是纯 JSON
+";
+
+    private const string DefaultNlpPrompt = @"
+根据以下自然语言描述，生成一份 CJDSL JSON。
+
+## 描述
+{描述}
+
+## 用户上下文
+- 角色：{角色}
+- 设备：{设备}
+
+## 生成要求
+1. 从描述中提取业务对象和字段
+2. 推断合适的字段类型（text, number, date, select, textarea）
+3. 选择最合适的布局（form, list, detail）
+4. 生成完整的 CJDSL 组件树
+5. 输出必须是纯 JSON
+";
+}

@@ -1,0 +1,104 @@
+@page "/component-mapping"
+@rendermode RenderMode.InteractiveServer
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.AccountTree" Class="mr-2" />组件映射关系
+</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+    DSL 组件类型与 MudBlazor 前端组件的对应关系，及各类型支持的属性配置
+</MudText>
+
+<MudTabs>
+    <MudTabPanel Text="全部" Icon="@Icons.Material.Filled.ViewList">
+        <ComponentMappingTable Components="_allComponents" />
+    </MudTabPanel>
+    <MudTabPanel Text="表单组件" Icon="@Icons.Material.Filled.EditNote">
+        <ComponentMappingTable Components="_formComponents" />
+    </MudTabPanel>
+    <MudTabPanel Text="布局组件" Icon="@Icons.Material.Filled.ViewModule">
+        <ComponentMappingTable Components="_layoutComponents" />
+    </MudTabPanel>
+    <MudTabPanel Text="展示组件" Icon="@Icons.Material.Filled.Preview">
+        <ComponentMappingTable Components="_displayComponents" />
+    </MudTabPanel>
+    <MudTabPanel Text="交互组件" Icon="@Icons.Material.Filled.TouchApp">
+        <ComponentMappingTable Components="_interactiveComponents" />
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private List<ComponentMappingTable.ComponentInfo> _allComponents = new();
+    private List<ComponentMappingTable.ComponentInfo> _formComponents = new();
+    private List<ComponentMappingTable.ComponentInfo> _layoutComponents = new();
+    private List<ComponentMappingTable.ComponentInfo> _displayComponents = new();
+    private List<ComponentMappingTable.ComponentInfo> _interactiveComponents = new();
+
+    private static List<ComponentMappingTable.ComponentInfo> FormComponents() => new()
+    {
+        new("text", "MudTextField<string>", "文本输入框", "Required, ReadOnly, Variant, Placeholder, AdornmentIcon, MaxLength, Class"),
+        new("number", "MudNumericField<decimal>", "数字输入框", "Required, Variant, Min, Max, Step, Class"),
+        new("select", "MudSelect<string>", "下拉选择", "Required, Clearable, Variant, DataSource, Class"),
+        new("autocomplete", "MudAutocomplete<string>", "自动补全", "Required, Variant, DataSource, Class"),
+        new("textarea", "MudTextField<string> (Multiline)", "多行文本", "Required, Lines, MaxLength, Variant, Class"),
+        new("date", "MudDatePicker", "日期选择器", "Required, Class"),
+        new("datetime", "MudDatePicker + Time", "日期时间选择器", "Required, Class"),
+        new("time", "MudTimePicker", "时间选择器", "Required, Class"),
+        new("switch", "MudSwitch<bool>", "开关", "Class"),
+        new("checkbox", "MudCheckBox<bool>", "复选框", "Class"),
+        new("radio", "MudRadioGroup<string>", "单选组", "DataSource, Class"),
+        new("slider", "MudSlider<decimal>", "滑块", "Min, Max, Class"),
+        new("rating", "MudRating", "评分", "Max, Class"),
+        new("file", "自定义 DslFileUploadRenderer", "文件上传", "Props 透传"),
+        new("richText", "自定义 DslRichTextRenderer", "富文本编辑器", "Props 透传"),
+    };
+
+    private static List<ComponentMappingTable.ComponentInfo> LayoutComponents() => new()
+    {
+        new("card", "MudCard / MudCardContent", "卡片容器", "Elevation, Class"),
+        new("form", "MudForm", "表单容器", "ValidationDelay"),
+        new("grid", "MudGrid / MudItem", "网格布局", "子组件 Span 属性控制列宽"),
+        new("stack", "MudStack", "堆叠布局", "Row, Spacing, Justify, AlignItems, Class"),
+        new("paper", "MudPaper", "纸张容器", "Elevation, Square, Class"),
+        new("divider", "MudDivider", "分割线", "Class"),
+        new("tabs", "MudTabs / MudTabPanel", "标签页", "Class"),
+        new("stepper", "MudStepper / MudStep", "步骤条", "Class"),
+        new("expansion", "MudExpansionPanels", "折叠面板", "MultiExpansion, Class"),
+        new("expansionPanel", "MudExpansionPanel", "折叠面板项", "Class"),
+    };
+
+    private static List<ComponentMappingTable.ComponentInfo> DisplayComponents() => new()
+    {
+        new("textDisplay", "MudText", "纯文本展示", "Typo, Color, Class"),
+        new("table", "MudTable<T>", "数据表格", "Hover, Striped, Dense, columns (Props)"),
+        new("chip", "MudChip<string>", "标签", "Color, Variant, Size, Class"),
+        new("badge", "MudBadge", "徽标", "Content, Color, Overlap, Class"),
+        new("avatar", "MudAvatar", "头像", "Color, Size, Text, Class"),
+        new("progress", "MudProgressLinear / MudProgressCircular", "进度条", "Color, Value, Max, Circular, Class"),
+        new("skeleton", "MudSkeleton", "骨架屏", "SkeletonType, Height, Class"),
+        new("tooltip", "MudTooltip", "工具提示", "Text, Placement"),
+        new("pagination", "MudPagination", "分页", "CurrentPage, TotalPages"),
+        new("alert", "MudAlert", "提示框", "Severity, Message, Class"),
+        new("list", "MudList<string>", "列表", "Class"),
+        new("listItem", "MudListItem<string>", "列表项", "Class"),
+        new("chart", "自定义 DslChartRenderer", "图表", "Props 透传"),
+    };
+
+    private static List<ComponentMappingTable.ComponentInfo> InteractiveComponents() => new()
+    {
+        new("button", "MudButton", "按钮", "Variant, Color, Size, StartIcon, EndIcon, Disabled, Class"),
+        new("iconButton", "MudIconButton", "图标按钮", "Icon, Color, Size, Disabled, Class"),
+    };
+
+    protected override void OnInitialized()
+    {
+        _formComponents = FormComponents();
+        _layoutComponents = LayoutComponents();
+        _displayComponents = DisplayComponents();
+        _interactiveComponents = InteractiveComponents();
+        _allComponents = _formComponents
+            .Concat(_layoutComponents)
+            .Concat(_displayComponents)
+            .Concat(_interactiveComponents)
+            .ToList();
+    }
+}

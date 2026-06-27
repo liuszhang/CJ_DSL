@@ -84,7 +84,7 @@ public class LLMResponse
 }
 
 /// <summary>
-/// LLM 配置
+/// LLM 生成响应
 /// </summary>
 public class LLMConfig
 {
