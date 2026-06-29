@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using CJDSL.Domain;
 
 namespace CJDSL.Domain.Entities.Dsl;
 
@@ -15,6 +16,11 @@ public class DslPage
     /// 页面布局模式：form, list, detail, dashboard, custom
     /// </summary>
     public string Layout { get; set; } = "form";
+
+    /// <summary>
+    /// 目标渲染平台
+    /// </summary>
+    public TargetPlatform TargetPlatform { get; set; } = TargetPlatform.Web;
 
     public DslDataSource? DataSource { get; set; }
     public DslPermission? Permission { get; set; }

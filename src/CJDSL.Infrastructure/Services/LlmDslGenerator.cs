@@ -192,6 +192,7 @@ public class LlmDslGenerator : IDslGenerator
             Title = source.Title,
             Description = source.Description,
             Layout = source.Layout,
+            TargetPlatform = source.TargetPlatform,
             Components = source.Components,
             DataSource = source.DataSource,
             Permission = source.Permission,

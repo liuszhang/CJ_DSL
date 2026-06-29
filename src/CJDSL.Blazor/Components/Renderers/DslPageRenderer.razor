@@ -67,7 +67,8 @@ else
                 {
                     Page = DslPage,
                     User = User ?? new UserContext(),
-                    ExpressionEvaluator = new ClientJintEvaluator()
+                    ExpressionEvaluator = new ClientJintEvaluator(),
+                    TargetPlatform = DslPage.TargetPlatform
                 };
 
                 _dispatcher = new DslEventDispatcher(

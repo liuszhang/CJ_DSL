@@ -12,7 +12,8 @@ namespace CJDSL.Application.Dsl.Queries;
 public record GetDslQuery(
     string PageCode,
     string? Role = null,
-    string? Device = null) : IRequest<Result<DslPage>>;
+    string? Device = null,
+    TargetPlatform? Platform = null) : IRequest<Result<DslPage>>;
 
 public class GetDslQueryHandler : IRequestHandler<GetDslQuery, Result<DslPage>>
 {
@@ -27,7 +28,7 @@ public class GetDslQueryHandler : IRequestHandler<GetDslQuery, Result<DslPage>>
 
     public async Task<Result<DslPage>> Handle(GetDslQuery request, CancellationToken ct)
     {
-        var cacheKey = $"dsl:page:{request.PageCode}:{request.Role ?? "all"}:{request.Device ?? "desktop"}";
+        var cacheKey = $"dsl:page:{request.PageCode}:{request.Role ?? "all"}:{request.Device ?? "desktop"}:{request.Platform?.ToString() ?? "Web"}";
         
         var cached = await _cache.GetAsync<DslPage>(cacheKey, ct);
         if (cached != null) return Result.Success(cached);

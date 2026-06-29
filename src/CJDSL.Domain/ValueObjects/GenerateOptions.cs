@@ -1,6 +1,18 @@
 namespace CJDSL.Domain;
 
 /// <summary>
+/// 目标渲染平台
+/// </summary>
+public enum TargetPlatform
+{
+    Web,
+    Wpf,
+    Maui,
+    React,
+    Vue
+}
+
+/// <summary>
 /// 生成选项
 /// </summary>
 public class GenerateOptions
@@ -9,6 +21,7 @@ public class GenerateOptions
     public List<string> Roles { get; set; } = new();
     public UserPreference Preference { get; set; } = new();
     public string DeviceType { get; set; } = "Desktop";
+    public TargetPlatform TargetPlatform { get; set; } = TargetPlatform.Web;
     public Dictionary<string, object>? DataContext { get; set; }
     public float Temperature { get; set; } = 0.3f;
 }

@@ -35,7 +35,7 @@ public class GenerateDslCommandHandler : IRequestHandler<GenerateDslCommand, Res
     public async Task<Result<DslPage>> Handle(GenerateDslCommand request, CancellationToken ct)
     {
         // 构建缓存键
-        var cacheKey = $"dsl:{request.MetaObjectCode}:{request.Layout}:{string.Join(",", request.UserContext.Roles)}:{request.Options?.DeviceType ?? "Desktop"}";
+        var cacheKey = $"dsl:{request.MetaObjectCode}:{request.Layout}:{string.Join(",", request.UserContext.Roles)}:{request.Options?.DeviceType ?? "Desktop"}:{request.Options?.TargetPlatform ?? TargetPlatform.Web}";
 
         // 尝试命中缓存
         var cached = await _cache.GetAsync<DslPage>(cacheKey, ct);

@@ -18,6 +18,7 @@ public class TemplateDslGenerator : IDslGenerator
             Title = metaObject.Name,
             Description = metaObject.Description,
             Layout = "form",
+            TargetPlatform = options.TargetPlatform,
             Components = BuildFormComponents(metaObject, options)
         };
         return Task.FromResult(dsl);
@@ -31,6 +32,7 @@ public class TemplateDslGenerator : IDslGenerator
             Title = $"{metaObject.Name}列表",
             Description = $"{metaObject.Name}列表页面",
             Layout = "list",
+            TargetPlatform = options.TargetPlatform,
             Components = BuildListComponents(metaObject, options)
         };
         return Task.FromResult(dsl);
@@ -44,6 +46,7 @@ public class TemplateDslGenerator : IDslGenerator
             Title = $"{metaObject.Name}详情",
             Description = $"{metaObject.Name}详情页面",
             Layout = "detail",
+            TargetPlatform = options.TargetPlatform,
             Components = BuildDetailComponents(metaObject, options)
         };
         return Task.FromResult(dsl);
@@ -51,24 +54,157 @@ public class TemplateDslGenerator : IDslGenerator
 
     public Task<DslPage> GenerateFromNlpAsync(string description, UserContext user, GenerateOptions options, CancellationToken ct = default)
     {
-        // 简化实现：根据关键词匹配元对象
+        var fields = ExtractFieldsFromIntent(description);
+        var title = ExtractTitleFromIntent(description);
+        var layout = options.Layout ?? "form";
+
         var dsl = new DslPage
         {
             Id = $"nlp_{Guid.NewGuid():N}",
-            Title = "智能生成页面",
+            Title = title,
             Description = description,
-            Layout = "form",
-            Components = new List<DslComponent>
+            Layout = layout,
+            TargetPlatform = options.TargetPlatform,
+            Components = layout == "list"
+                ? BuildNlpListComponents(title, fields)
+                : BuildNlpFormComponents(title, fields)
+        };
+        return Task.FromResult(dsl);
+    }
+
+    private static string ExtractTitleFromIntent(string description)
+    {
+        // "用户需要提交设备报修单，请生成..." → "设备报修单"
+        var match = System.Text.RegularExpressions.Regex.Match(description, @"用户需要(.+?)[，,]");
+        return match.Success ? match.Groups[1].Value.Trim() : "智能生成页面";
+    }
+
+    private static List<string> ExtractFieldsFromIntent(string description)
+    {
+        // "包含设备名称、设备类型、报修日期、故障描述等字段" → ["设备名称", "设备类型", ...]
+        var match = System.Text.RegularExpressions.Regex.Match(description, @"包含(.+?)(?:等字段|等)");
+        if (!match.Success) return new List<string>();
+
+        return match.Groups[1].Value
+            .Split(new[] { '、', '，', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(f => f.Trim())
+            .ToList();
+    }
+
+    private static string InferComponentType(string fieldName)
+    {
+        var lower = fieldName.ToLower();
+        if (lower.Contains("日期") || lower.Contains("时间")) return "date";
+        if (lower.Contains("类型") || lower.Contains("类别") || lower.Contains("状态") || lower.Contains("方式")) return "select";
+        if (lower.Contains("描述") || lower.Contains("说明") || lower.Contains("备注") || lower.Contains("意见")) return "textarea";
+        if (lower.Contains("金额") || lower.Contains("数量") || lower.Contains("总数") || lower.Contains("数")) return "number";
+        if (lower.Contains("开关") || lower.Contains("是否") || lower.Contains("确认")) return "switch";
+        return "text";
+    }
+
+    private static List<DslComponent> BuildNlpFormComponents(string title, List<string> fields)
+    {
+        var formFields = fields.Select(f => new DslComponent
+        {
+            Type = InferComponentType(f),
+            Label = f,
+            FieldName = f,
+            Span = 6,
+            Props = new Dictionary<string, object> { { "Placeholder", $"请输入{f}" } },
+        }).ToList();
+
+        return new List<DslComponent>
+        {
+            new()
             {
-                new()
+                Type = "card",
+                Props = new Dictionary<string, object> { { "Elevation", 2 } },
+                Children = new List<DslComponent>
                 {
-                    Type = "textDisplay",
-                    Props = new Dictionary<string, object> { { "Typo", "h6" } },
-                    Label = "NLP 生成结果（演示）"
+                    new()
+                    {
+                        Type = "textDisplay",
+                        Props = new Dictionary<string, object> { { "Typo", "h5" } },
+                        Label = title
+                    },
+                    new() { Type = "divider" },
+                    new()
+                    {
+                        Type = "grid",
+                        Children = formFields
+                    },
+                    new() { Type = "divider" },
+                    new()
+                    {
+                        Type = "stack",
+                        Props = new Dictionary<string, object> { { "Row", true } },
+                        Children = new List<DslComponent>
+                        {
+                            new()
+                            {
+                                Type = "button", Label = "取消",
+                                Props = new Dictionary<string, object> { { "Variant", "Outlined" }, { "Color", "Secondary" } }
+                            },
+                            new()
+                            {
+                                Type = "button", Label = "确认",
+                                Props = new Dictionary<string, object> { { "Variant", "Filled" }, { "Color", "Primary" } }
+                            }
+                        }
+                    }
                 }
             }
         };
-        return Task.FromResult(dsl);
+    }
+
+    private static List<DslComponent> BuildNlpListComponents(string title, List<string> fields)
+    {
+        var columns = fields.Select(f => new Dictionary<string, object>
+        {
+            { "title", f },
+            { "dataIndex", f },
+        }).ToList();
+
+        return new List<DslComponent>
+        {
+            new()
+            {
+                Type = "card",
+                Children = new List<DslComponent>
+                {
+                    new()
+                    {
+                        Type = "textDisplay",
+                        Props = new Dictionary<string, object> { { "Typo", "h5" } },
+                        Label = title
+                    },
+                    new()
+                    {
+                        Type = "stack",
+                        Props = new Dictionary<string, object> { { "Row", true } },
+                        Children = new List<DslComponent>
+                        {
+                            new()
+                            {
+                                Type = "text",
+                                Props = new Dictionary<string, object> { { "Placeholder", "搜索..." } },
+                                DataBind = "@query.keyword"
+                            },
+                            new()
+                            {
+                                Type = "button", Label = "查询",
+                                Props = new Dictionary<string, object> { { "Color", "Primary" } }
+                            }
+                        }
+                    },
+                    new()
+                    {
+                        Type = "table",
+                        Props = new Dictionary<string, object> { { "columns", columns } }
+                    }
+                }
+            }
+        };
     }
 
     public Task<DslPage> GenerateDashboardAsync(M4_Scene scene, GenerateOptions options, CancellationToken ct = default)
@@ -296,6 +432,7 @@ public class TemplateDslGenerator : IDslGenerator
             Title = source.Title,
             Description = source.Description,
             Layout = source.Layout,
+            TargetPlatform = source.TargetPlatform,
             Components = source.Components
         };
     }

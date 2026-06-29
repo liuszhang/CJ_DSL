@@ -68,27 +68,29 @@ public class DslPromptBuilder : IDslPromptBuilder
 ## 用户上下文
 - 角色：{string.Join(", ", options.Roles)}
 - 设备：{options.DeviceType}
+- 目标平台：{options.TargetPlatform}
 - 布局偏好：{options.Preference.Density}
 
 ## 生成要求
 1. layout: ""form""
-2. 最外层使用 card 组件包裹
-3. 内部使用 form 组件包含字段
-4. 字段使用 grid 布局，每行 2 列（桌面端），每列 span=6
-5. 根据字段类型选择合适的组件类型：
+2. 输出 DslPage 中必须包含 ""targetPlatform"": ""{options.TargetPlatform}""
+3. 最外层使用 card 组件包裹
+4. 内部使用 form 组件包含字段
+5. 字段使用 grid 布局，每行 2 列（桌面端），每列 span=6
+6. 根据字段类型选择合适的组件类型：
    - string -> text
    - number -> number
    - date -> date
    - select -> select（配置 DataSource 指向字典编码）
    - textarea -> textarea
    - boolean -> switch
-6. 必填字段配置 Required=true 和 validationRules（required 类型）
-7. 有字典编码的字段配置 DataSource type=dictionary
-8. 表单底部添加按钮区域（stack Row=true Justify=flex-end）：
+7. 必填字段配置 Required=true 和 validationRules（required 类型）
+8. 有字典编码的字段配置 DataSource type=dictionary
+9. 表单底部添加按钮区域（stack Row=true Justify=flex-end）：
    - 重置按钮：handler=reset, params formId=formId
    - 保存按钮：handler=submit, params endpoint=/api/{metaObject.Code}/save
    - 提交按钮：handler=chain, 包含 validate + apiCall + showToast + navigate
-9. 输出必须是纯 JSON，不要包含 Markdown 代码块标记
+10. 输出必须是纯 JSON，不要包含 Markdown 代码块标记
 ";
     }
 
@@ -113,17 +115,21 @@ public class DslPromptBuilder : IDslPromptBuilder
 ## 列表列（取前 8 个属性）
 {columns}
 
+## 用户上下文
+- 目标平台：{options.TargetPlatform}
+
 ## 生成要求
 1. layout: ""list""
-2. 包含搜索区域（stack Row=true）：
+2. 输出 DslPage 中必须包含 ""targetPlatform"": ""{options.TargetPlatform}""
+3. 包含搜索区域（stack Row=true）：
    - 搜索输入框（text，Placeholder=搜索）
    - 查询按钮（button，Color=Primary）
    - 新增按钮（button，Variant=Outlined）
-3. 表格区域（table 组件）：
+4. 表格区域（table 组件）：
    - columns 配置为上述列
    - rowKey=id
    - pagination=true
-4. 输出必须是纯 JSON
+5. 输出必须是纯 JSON
 ";
     }
 
@@ -148,13 +154,15 @@ public class DslPromptBuilder : IDslPromptBuilder
 ## 用户上下文
 - 角色：{string.Join(", ", user.Roles)}
 - 设备：{options.DeviceType}
+- 目标平台：{options.TargetPlatform}
 
 ## 生成要求
 1. 从描述中提取业务对象和字段
 2. 推断合适的字段类型（text, number, date, select, textarea）
 3. 选择最合适的布局（form, list, detail）
-4. 生成完整的 CJDSL 组件树
-5. 输出必须是纯 JSON
+4. 输出 DslPage 中必须包含 ""targetPlatform"": ""{options.TargetPlatform}""
+5. 生成完整的 CJDSL 组件树
+6. 输出必须是纯 JSON
 ";
     }
 
@@ -172,6 +180,7 @@ public class DslPromptBuilder : IDslPromptBuilder
         template = template.Replace("{状态列表}", states);
         template = template.Replace("{角色}", string.Join(", ", options.Roles));
         template = template.Replace("{设备}", options.DeviceType);
+        template = template.Replace("{平台}", options.TargetPlatform.ToString());
         template = template.Replace("{密度}", options.Preference.Density);
         return template;
     }
@@ -188,6 +197,7 @@ public class DslPromptBuilder : IDslPromptBuilder
   ""title"": ""string"",
   ""description"": ""string"",
   ""layout"": ""form|list|detail|dashboard|custom"",
+  ""targetPlatform"": ""Web|Wpf|Maui|React|Vue"",
   ""components"": [ DslComponent ],
   ""dataSource"": { ... },
   ""permission"": { ""requiredRoles"": [], ""requiredPermissions"": [] },
