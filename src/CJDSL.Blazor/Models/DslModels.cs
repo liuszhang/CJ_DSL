@@ -3,6 +3,18 @@ using Microsoft.AspNetCore.Components;
 namespace CJDSL.Blazor.Models;
 
 /// <summary>
+/// 目标渲染平台
+/// </summary>
+public enum TargetPlatform
+{
+    Web,
+    Wpf,
+    Maui,
+    React,
+    Vue
+}
+
+/// <summary>
 /// DSL 渲染上下文
 /// </summary>
 public class DslRenderContext
@@ -11,6 +23,7 @@ public class DslRenderContext
     public DslDataStore DataStore { get; } = new();
     public UserContext User { get; set; } = null!;
     public IExpressionEvaluator ExpressionEvaluator { get; set; } = null!;
+    public TargetPlatform TargetPlatform { get; set; } = TargetPlatform.Web;
     public Dictionary<string, FormState> Forms { get; } = new();
     public object? RowData { get; set; }
     public Dictionary<string, object> ComponentRefs { get; } = new();
@@ -35,6 +48,7 @@ public class DslDataStore
 
     public object? Get(string path)
     {
+        if (string.IsNullOrEmpty(path)) return null;
         if (path.StartsWith('@')) path = path[1..];
         var segments = path.Split('.');
         var current = _data.GetValueOrDefault(segments[0]);
@@ -141,6 +155,7 @@ public class DslPage
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Layout { get; set; } = "form";
+    public TargetPlatform TargetPlatform { get; set; } = TargetPlatform.Web;
     public List<DslComponent> Components { get; set; } = new();
     public List<DslPageEvent>? PageEvents { get; set; }
 }

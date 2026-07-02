@@ -12,18 +12,18 @@ namespace CJDSL.Infrastructure.Services;
 /// </summary>
 public class LlmDslGenerator : IDslGenerator
 {
-    private readonly ILLMClient _llmClient;
+    private readonly ILLMClientProvider _clientProvider;
     private readonly IDslPromptBuilder _promptBuilder;
     private readonly IDslResponseParser _responseParser;
     private readonly ILogger<LlmDslGenerator> _logger;
 
     public LlmDslGenerator(
-        ILLMClient llmClient,
+        ILLMClientProvider clientProvider,
         IDslPromptBuilder promptBuilder,
         IDslResponseParser responseParser,
         ILogger<LlmDslGenerator> logger)
     {
-        _llmClient = llmClient;
+        _clientProvider = clientProvider;
         _promptBuilder = promptBuilder;
         _responseParser = responseParser;
         _logger = logger;
@@ -117,7 +117,10 @@ public class LlmDslGenerator : IDslGenerator
     {
         try
         {
-            var response = await _llmClient.GenerateAsync(new LLMRequest
+            var client = _clientProvider.GetClient();
+            _logger.LogInformation("Using LLM provider: {Provider}", client.Provider);
+
+            var response = await client.GenerateAsync(new LLMRequest
             {
                 SystemPrompt = systemPrompt,
                 UserPrompt = userPrompt,
@@ -189,6 +192,7 @@ public class LlmDslGenerator : IDslGenerator
             Title = source.Title,
             Description = source.Description,
             Layout = source.Layout,
+            TargetPlatform = source.TargetPlatform,
             Components = source.Components,
             DataSource = source.DataSource,
             Permission = source.Permission,

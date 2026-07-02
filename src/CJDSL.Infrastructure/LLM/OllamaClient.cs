@@ -1,9 +1,8 @@
-using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CJDSL.Domain.Configuration;
 using CJDSL.Domain.Interfaces;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace CJDSL.Infrastructure.LLM;
 
@@ -13,22 +12,19 @@ namespace CJDSL.Infrastructure.LLM;
 public class OllamaClient : ILLMClient
 {
     private readonly HttpClient _httpClient;
-    private readonly LLMConfig _config;
+    private readonly LlmProviderConfig _providerConfig;
     private readonly ILogger<OllamaClient> _logger;
 
     public string Provider => "Ollama";
 
-    public OllamaClient(
-        HttpClient httpClient,
-        IOptions<LLMConfig> config,
-        ILogger<OllamaClient> logger)
+    public OllamaClient(HttpClient httpClient, LlmProviderConfig providerConfig, ILogger<OllamaClient> logger)
     {
         _httpClient = httpClient;
-        _config = config.Value;
+        _providerConfig = providerConfig;
         _logger = logger;
 
-        _httpClient.BaseAddress = new Uri(_config.BaseUrl.TrimEnd('/') + "/");
-        _httpClient.Timeout = TimeSpan.FromSeconds(_config.DefaultTimeoutSeconds);
+        _httpClient.BaseAddress = new Uri(providerConfig.BaseUrl.TrimEnd('/') + "/");
+        _httpClient.Timeout = TimeSpan.FromSeconds(providerConfig.TimeoutSeconds);
     }
 
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
@@ -40,7 +36,7 @@ public class OllamaClient : ILLMClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Ollama 服务可用性检查失败");
+            _logger.LogWarning(ex, "Ollama service availability check failed for {Name}", _providerConfig.Name);
             return false;
         }
     }
@@ -57,7 +53,7 @@ public class OllamaClient : ILLMClient
             {
                 var payload = new
                 {
-                    model = _config.Model,
+                    model = _providerConfig.Model,
                     system = request.SystemPrompt,
                     prompt = request.UserPrompt,
                     stream = false,
@@ -77,13 +73,13 @@ public class OllamaClient : ILLMClient
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("Ollama API 错误: {StatusCode} - {Body}", response.StatusCode, responseBody);
+                    _logger.LogError("Ollama API error: {StatusCode} - {Body}", response.StatusCode, responseBody);
                     return new LLMResponse
                     {
                         IsSuccess = false,
-                        ErrorMessage = $"API 错误: {response.StatusCode} - {responseBody}",
+                        ErrorMessage = $"API error: {response.StatusCode} - {responseBody}",
                         Provider = Provider,
-                        Model = _config.Model
+                        Model = _providerConfig.Model
                     };
                 }
 
@@ -105,13 +101,13 @@ public class OllamaClient : ILLMClient
                     CompletionTokens = result?.EvalCount,
                     ElapsedMs = sw.ElapsedMilliseconds,
                     Provider = Provider,
-                    Model = _config.Model
+                    Model = _providerConfig.Model
                 };
             }
             catch (Exception ex) when (attempt < maxRetries)
             {
                 lastException = ex;
-                _logger.LogWarning(ex, "Ollama 请求失败，第 {Attempt} 次重试...", attempt + 1);
+                _logger.LogWarning(ex, "Ollama request failed, retry {Attempt}...", attempt + 1);
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), ct);
             }
         }
@@ -120,9 +116,9 @@ public class OllamaClient : ILLMClient
         return new LLMResponse
         {
             IsSuccess = false,
-            ErrorMessage = $"请求失败（重试 {maxRetries} 次）: {lastException?.Message}",
+            ErrorMessage = $"Request failed (retried {maxRetries} times): {lastException?.Message}",
             Provider = Provider,
-            Model = _config.Model,
+            Model = _providerConfig.Model,
             ElapsedMs = sw.ElapsedMilliseconds
         };
     }
@@ -133,7 +129,7 @@ public class OllamaClient : ILLMClient
     {
         var payload = new
         {
-            model = _config.Model,
+            model = _providerConfig.Model,
             system = request.SystemPrompt,
             prompt = request.UserPrompt,
             stream = true,
@@ -154,11 +150,7 @@ public class OllamaClient : ILLMClient
             if (string.IsNullOrWhiteSpace(line)) continue;
 
             OllamaGenerateResponse? chunk = null;
-            try
-            {
-                chunk = JsonSerializer.Deserialize<OllamaGenerateResponse>(line);
-            }
-            catch { /* ignore malformed chunks */ }
+            try { chunk = JsonSerializer.Deserialize<OllamaGenerateResponse>(line); } catch { }
 
             if (!string.IsNullOrEmpty(chunk?.Response)) yield return chunk.Response;
         }

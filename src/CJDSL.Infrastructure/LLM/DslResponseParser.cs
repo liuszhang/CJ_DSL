@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CJDSL.Domain;
 using CJDSL.Domain.Entities.Dsl;
 
 namespace CJDSL.Infrastructure.LLM;
@@ -45,7 +46,8 @@ public class DslResponseParser : IDslResponseParser
                 Id = GetString(element, "id") ?? Guid.NewGuid().ToString("N"),
                 Title = GetString(element, "title") ?? "Untitled",
                 Description = GetString(element, "description") ?? "",
-                Layout = GetString(element, "layout") ?? "form"
+                Layout = GetString(element, "layout") ?? "form",
+                TargetPlatform = ParseTargetPlatform(GetString(element, "targetPlatform"))
             };
 
             if (element.TryGetProperty("components", out var components) && components.ValueKind == JsonValueKind.Array)
@@ -288,5 +290,11 @@ public class DslResponseParser : IDslResponseParser
         if (rawText.StartsWith("```")) rawText = rawText[3..];
         if (rawText.EndsWith("```")) rawText = rawText[..^3];
         return rawText.Trim();
+    }
+
+    private static TargetPlatform ParseTargetPlatform(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return TargetPlatform.Web;
+        return Enum.TryParse<TargetPlatform>(value, true, out var result) ? result : TargetPlatform.Web;
     }
 }

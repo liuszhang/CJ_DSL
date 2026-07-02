@@ -1,6 +1,7 @@
 using CJDSL.Application.Dsl;
 using CJDSL.Application.Dsl.Commands;
 using CJDSL.Application.Dsl.Queries;
+using CJDSL.Domain;
 using CJDSL.Domain.Entities.Dsl;
 using CJDSL.Domain.Interfaces;
 using CJDSL.Domain.Shared;
@@ -63,10 +64,11 @@ public static class DslEndpoints
             string pageCode,
             [FromQuery] string? role,
             [FromQuery] string? device,
+            [FromQuery] TargetPlatform? platform,
             IMediator mediator,
             CancellationToken ct) =>
         {
-            var query = new GetDslQuery(pageCode, role, device);
+            var query = new GetDslQuery(pageCode, role, device, platform);
             var result = await mediator.Send(query, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value)

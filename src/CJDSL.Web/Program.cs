@@ -1,5 +1,6 @@
 using CJDSL.Api;
 using CJDSL.Api.Endpoints;
+using CJDSL.Blazor.Components.Renderers;
 using CJDSL.Infrastructure;
 using CJDSL.Web.Components;
 using CJDSL.Web.Services;
@@ -29,7 +30,8 @@ public class Program
 
         // CJDSL 各层服务
         builder.Services.AddCJDSLApi();
-        builder.Services.AddCJDSLInfrastructure();
+        builder.Services.AddCJDSLInfrastructure(builder.Configuration);
+        builder.Services.AddDslRenderers();
 
         // 浮窗管理服务
         builder.Services.AddSingleton<FloatService>();

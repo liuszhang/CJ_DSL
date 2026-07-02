@@ -8,381 +8,304 @@
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
 @inject HttpClient HttpClient
+@inject DslRendererRegistry RendererRegistry
 
 @if (CheckVisibility())
 {
-    @switch (Component.Type)
+    @if (_matchedRenderer != null)
     {
-        case "card":
-            <MudCard Elevation="@GetIntProp("Elevation", 1)" Class="@GetStringProp("Class")">
-                @if (!string.IsNullOrEmpty(Component.Label))
-                {
-                    <MudCardHeader>
-                        <MudText Typo="Typo.h6">@Component.Label</MudText>
-                    </MudCardHeader>
-                }
-                <MudCardContent>
+        @_matchedRenderer.Render(Component, Context)
+    }
+    else
+    {
+        @switch (Component.Type)
+        {
+            case "form":
+                <MudForm @ref="_formRef" @bind-IsValid="_isValid">
                     @RenderChildren()
-                </MudCardContent>
-            </MudCard>
-            break;
+                </MudForm>
+                break;
 
-        case "form":
-            <MudForm @ref="_formRef" @bind-IsValid="_isValid">
-                @RenderChildren()
-            </MudForm>
-            break;
+            case "paper":
+                <MudPaper Elevation="@GetIntProp("Elevation", 1)" Class="@GetStringProp("Class")" Square="@GetBoolProp("Square")">
+                    @RenderChildren()
+                </MudPaper>
+                break;
 
-        case "grid":
-            <MudGrid>
-                @foreach (var child in Component.Children ?? Enumerable.Empty<DslComponent>())
-                {
-                    <MudItem xs="12" sm="@GetSpan(child)" md="@GetSpan(child)">
-                        <DslComponentRenderer Component="child" />
-                    </MudItem>
-                }
-            </MudGrid>
-            break;
+            case "number":
+                <MudNumericField T="decimal"
+                               @bind-Value="_decimalValue"
+                               Label="@Component.Label"
+                               Required="@GetBoolProp("Required")"
+                               Variant="@GetVariant()"
+                               Disabled="@IsDisabled()"
+                               Class="@GetStringProp("Class")" />
+                break;
 
-        case "stack":
-            <MudStack Row="@GetBoolProp("Row")" Spacing="@GetIntProp("Spacing", 2)" Justify="@GetJustify()" AlignItems="@GetAlignItems()" Class="@GetStringProp("Class")">
-                @RenderChildren()
-            </MudStack>
-            break;
+            case "autocomplete":
+                <MudAutocomplete T="string"
+                                 @bind-Value="_stringValue"
+                                 Label="@Component.Label"
+                                 Required="@GetBoolProp("Required")"
+                                 Variant="@GetVariant()"
+                                 Disabled="@IsDisabled()"
+                                 SearchFunc="@SearchAutoComplete"
+                                 Class="@GetStringProp("Class")" />
+                break;
 
-        case "paper":
-            <MudPaper Elevation="@GetIntProp("Elevation", 1)" Class="@GetStringProp("Class")" Square="@GetBoolProp("Square")">
-                @RenderChildren()
-            </MudPaper>
-            break;
+            case "textarea":
+                <MudTextField T="string"
+                              @bind-Value="_stringValue"
+                              Label="@Component.Label"
+                              Required="@GetBoolProp("Required")"
+                              Lines="@GetIntProp("Lines", 3)"
+                              MaxLength="@GetIntProp("MaxLength")"
+                              Variant="@GetVariant()"
+                              Disabled="@IsDisabled()"
+                              Class="@GetStringProp("Class")" />
+                break;
 
-        case "text":
-            <MudTextField T="string"
-                          @bind-Value="_stringValue"
-                          Label="@Component.Label"
-                          Required="@GetBoolProp("Required")"
-                          ReadOnly="@GetBoolProp("ReadOnly")"
-                          Variant="@GetVariant()"
-                          Placeholder="@GetStringProp("Placeholder")"
-                          AdornmentIcon="@GetIcon("AdornmentIcon")"
-                          MaxLength="@GetIntProp("MaxLength")"
-                          Disabled="@IsDisabled()"
-                          For="@(() => _stringValue)"
-                          Class="@GetStringProp("Class")" />
-            break;
+            case "date":
+                <MudDatePicker @bind-Date="_dateValue"
+                               Label="@Component.Label"
+                               Required="@GetBoolProp("Required")"
+                               Disabled="@IsDisabled()"
+                               Class="@GetStringProp("Class")" />
+                break;
 
-        case "number":
-            <MudNumericField T="decimal"
-                           @bind-Value="_decimalValue"
+            case "datetime":
+                <MudDatePicker @bind-Date="_dateValue"
+                               Label="@Component.Label"
+                               Required="@GetBoolProp("Required")"
+                               Disabled="@IsDisabled()"
+                               ShowToolbar="false"
+                               Class="@GetStringProp("Class")" />
+                break;
+
+            case "time":
+                <MudTimePicker @bind-Time="_timeValue"
+                               Label="@Component.Label"
+                               Required="@GetBoolProp("Required")"
+                               Disabled="@IsDisabled()"
+                               Class="@GetStringProp("Class")" />
+                break;
+
+            case "switch":
+                <MudSwitch T="bool"
+                           @bind-Value="_boolValue"
                            Label="@Component.Label"
-                           Required="@GetBoolProp("Required")"
-                           Variant="@GetVariant()"
                            Disabled="@IsDisabled()"
+                           Color="Color.Primary"
                            Class="@GetStringProp("Class")" />
-            break;
+                break;
 
-        case "select":
-            <MudSelect T="string"
-                       @bind-Value="_stringValue"
-                       Label="@Component.Label"
-                       Required="@GetBoolProp("Required")"
-                       Clearable="@GetBoolProp("Clearable")"
-                       Variant="@GetVariant()"
-                       Disabled="@IsDisabled()"
-                       Class="@GetStringProp("Class")">
-                @foreach (var item in GetSelectItems())
-                {
-                    <MudSelectItem Value="@item.Value">@item.Label</MudSelectItem>
-                }
-            </MudSelect>
-            break;
-
-        case "autocomplete":
-            <MudAutocomplete T="string"
-                             @bind-Value="_stringValue"
+            case "checkbox":
+                <MudCheckBox T="bool"
+                             @bind-Value="_boolValue"
                              Label="@Component.Label"
-                             Required="@GetBoolProp("Required")"
-                             Variant="@GetVariant()"
                              Disabled="@IsDisabled()"
-                             SearchFunc="@SearchAutoComplete"
+                             Color="Color.Primary"
                              Class="@GetStringProp("Class")" />
-            break;
+                break;
 
-        case "textarea":
-            <MudTextField T="string"
-                          @bind-Value="_stringValue"
-                          Label="@Component.Label"
-                          Required="@GetBoolProp("Required")"
-                          Lines="@GetIntProp("Lines", 3)"
-                          MaxLength="@GetIntProp("MaxLength")"
-                          Variant="@GetVariant()"
-                          Disabled="@IsDisabled()"
-                          Class="@GetStringProp("Class")" />
-            break;
+            case "radio":
+                <MudField Label="@Component.Label" Disabled="@IsDisabled()">
+                    <MudRadioGroup T="string" @bind-SelectedOption="_stringValue">
+                        @foreach (var item in GetSelectItems())
+                        {
+                            <MudRadio T="string" Option="@item.Value">@item.Label</MudRadio>
+                        }
+                    </MudRadioGroup>
+                </MudField>
+                break;
 
-        case "date":
-            <MudDatePicker @bind-Date="_dateValue"
-                           Label="@Component.Label"
-                           Required="@GetBoolProp("Required")"
+            case "slider":
+                <MudSlider T="decimal"
+                            @bind-Value="_decimalValue"
+                            Min="@(GetDecimalProp("Min", 0) ?? 0)"
+                            Max="@(GetDecimalProp("Max", 100) ?? 100)"
+                            Disabled="@IsDisabled()"
+                            Color="Color.Primary"
+                            Class="@GetStringProp("Class")" />
+                break;
+
+            case "rating":
+                <MudRating @bind-SelectedValue="_intValue"
+                           MaxValue="@GetIntProp("Max", 5)"
                            Disabled="@IsDisabled()"
                            Class="@GetStringProp("Class")" />
-            break;
+                break;
 
-        case "datetime":
-            <MudDatePicker @bind-Date="_dateValue"
-                           Label="@Component.Label"
-                           Required="@GetBoolProp("Required")"
-                           Disabled="@IsDisabled()"
-                           ShowToolbar="false"
-                           Class="@GetStringProp("Class")" />
-            break;
+            case "iconButton":
+                <MudIconButton Icon="@GetIcon("Icon")"
+                              Color="@GetColor()"
+                              Size="@GetSize()"
+                              Disabled="@IsDisabled()"
+                              OnClick="@HandleClick"
+                              Class="@GetStringProp("Class")" />
+                break;
 
-        case "time":
-            <MudTimePicker @bind-Time="_timeValue"
-                           Label="@Component.Label"
-                           Required="@GetBoolProp("Required")"
-                           Disabled="@IsDisabled()"
-                           Class="@GetStringProp("Class")" />
-            break;
-
-        case "switch":
-            <MudSwitch T="bool"
-                       @bind-Value="_boolValue"
-                       Label="@Component.Label"
-                       Disabled="@IsDisabled()"
-                       Color="Color.Primary"
-                       Class="@GetStringProp("Class")" />
-            break;
-
-        case "checkbox":
-            <MudCheckBox T="bool"
-                         @bind-Value="_boolValue"
-                         Label="@Component.Label"
-                         Disabled="@IsDisabled()"
-                         Color="Color.Primary"
-                         Class="@GetStringProp("Class")" />
-            break;
-
-        case "radio":
-            <MudField Label="@Component.Label" Disabled="@IsDisabled()">
-                <MudRadioGroup T="string" @bind-SelectedOption="_stringValue">
-                    @foreach (var item in GetSelectItems())
-                    {
-                        <MudRadio T="string" Option="@item.Value">@item.Label</MudRadio>
-                    }
-                </MudRadioGroup>
-            </MudField>
-            break;
-
-        case "slider":
-            <MudSlider T="decimal"
-                        @bind-Value="_decimalValue"
-                        Min="@(GetDecimalProp("Min", 0) ?? 0)"
-                        Max="@(GetDecimalProp("Max", 100) ?? 100)"
-                        Disabled="@IsDisabled()"
-                        Color="Color.Primary"
-                        Class="@GetStringProp("Class")" />
-            break;
-
-        case "rating":
-            <MudRating @bind-SelectedValue="_intValue"
-                       MaxValue="@GetIntProp("Max", 5)"
-                       Disabled="@IsDisabled()"
-                       Class="@GetStringProp("Class")" />
-            break;
-
-        case "button":
-            <MudButton OnClick="@HandleClick"
-                       Variant="@GetButtonVariant()"
-                       Color="@GetColor()"
-                       StartIcon="@GetIcon("StartIcon")"
-                       EndIcon="@GetIcon("EndIcon")"
-                       Size="@GetSize()"
-                       Disabled="@IsDisabled()"
-                       Class="@GetStringProp("Class")">
-                @GetButtonLabel()
-            </MudButton>
-            break;
-
-        case "iconButton":
-            <MudIconButton Icon="@GetIcon("Icon")"
+            case "chip":
+                <MudChip T="string"
+                          Text="@(Component.Label ?? "")"
                           Color="@GetColor()"
+                          Variant="@GetChipVariant()"
                           Size="@GetSize()"
                           Disabled="@IsDisabled()"
-                          OnClick="@HandleClick"
                           Class="@GetStringProp("Class")" />
-            break;
+                break;
 
-        case "textDisplay":
-            <MudText Typo="@GetTypo()" Class="@GetStringProp("Class")" Color="@GetTextColor()">
-                @GetDisplayText()
-            </MudText>
-            break;
+            case "badge":
+                <MudBadge Content="@(GetStringProp("Content") ?? "")"
+                          Color="@GetColor()"
+                          Overlap="@GetBoolProp("Overlap")"
+                          Visible="@(!string.IsNullOrEmpty(GetStringProp("Content")))"
+                          Class="@GetStringProp("Class")">
+                    @RenderChildren()
+                </MudBadge>
+                break;
 
-        case "divider":
-            <MudDivider Class="@GetStringProp("Class")" />
-            break;
+            case "avatar":
+                <MudAvatar Color="@GetColor()" Size="@GetSize()" Class="@GetStringProp("Class")">
+                    @(Component.Label ?? GetStringProp("Text") ?? "")
+                </MudAvatar>
+                break;
 
-        case "chip":
-            <MudChip T="string"
-                      Text="@(Component.Label ?? "")"
-                      Color="@GetColor()"
-                      Variant="@GetChipVariant()"
-                      Size="@GetSize()"
-                      Disabled="@IsDisabled()"
-                      Class="@GetStringProp("Class")" />
-            break;
-
-        case "badge":
-            <MudBadge Content="@(GetStringProp("Content") ?? "")"
-                      Color="@GetColor()"
-                      Overlap="@GetBoolProp("Overlap")"
-                      Visible="@(!string.IsNullOrEmpty(GetStringProp("Content")))"
-                      Class="@GetStringProp("Class")">
-                @RenderChildren()
-            </MudBadge>
-            break;
-
-        case "avatar":
-            <MudAvatar Color="@GetColor()" Size="@GetSize()" Class="@GetStringProp("Class")">
-                @(Component.Label ?? GetStringProp("Text") ?? "")
-            </MudAvatar>
-            break;
-
-        case "progress":
-            @if (GetBoolProp("Circular"))
-            {
-                <MudProgressCircular Color="@GetColor()" Size="@GetSize()" Value="@GetIntProp("Value", 50)" Max="@GetIntProp("Max", 100)" Class="@GetStringProp("Class")" />
-            }
-            else
-            {
-                <MudProgressLinear Color="@GetColor()" Value="@GetIntProp("Value", 50)" Max="@GetIntProp("Max", 100)" Class="@GetStringProp("Class")" />
-            }
-            break;
-
-        case "skeleton":
-            <MudSkeleton SkeletonType="@GetSkeletonType()" Width="100%" Height="@GetStringProp("Height", "40px")" Class="@GetStringProp("Class")" />
-            break;
-
-        case "expansion":
-            <MudExpansionPanels MultiExpansion="@GetBoolProp("MultiExpansion")" Class="@GetStringProp("Class")">
-                @RenderChildren()
-            </MudExpansionPanels>
-            break;
-
-        case "expansionPanel":
-            <MudExpansionPanel Text="@(Component.Label ?? "")" Disabled="@IsDisabled()">
-                @RenderChildren()
-            </MudExpansionPanel>
-            break;
-
-        case "tooltip":
-            <MudTooltip Text="@(GetStringProp("Text") ?? Component.Label ?? "")" Placement="@GetPlacement()">
-                @RenderChildren()
-            </MudTooltip>
-            break;
-
-        case "tabs":
-            <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Class="@GetStringProp("Class")">
-                @if (Component.Children != null)
+            case "progress":
+                @if (GetBoolProp("Circular"))
                 {
-                    @foreach (var child in Component.Children)
-                    {
-                        <MudTabPanel Text="@(child.Label ?? "Tab")">
-                            @if (child.Children != null)
-                            {
-                                @foreach (var grandChild in child.Children)
-                                {
-                                    <DslComponentRenderer Component="grandChild" />
-                                }
-                            }
-                        </MudTabPanel>
-                    }
+                    <MudProgressCircular Color="@GetColor()" Size="@GetSize()" Value="@GetIntProp("Value", 50)" Max="@GetIntProp("Max", 100)" Class="@GetStringProp("Class")" />
                 }
-            </MudTabs>
-            break;
-
-        case "stepper":
-            <MudStepper @bind-ActiveIndex="_activeTabIndex" Class="@GetStringProp("Class")">
-                @if (Component.Children != null)
+                else
                 {
-                    @foreach (var child in Component.Children)
-                    {
-                        <MudStep @key="child.Id" Text="@(child.Label ?? "Step")" Disabled="@IsDisabled()">
-                            @if (child.Children != null)
-                            {
-                                @foreach (var grandChild in child.Children)
-                                {
-                                    <DslComponentRenderer Component="grandChild" />
-                                }
-                            }
-                        </MudStep>
-                    }
+                    <MudProgressLinear Color="@GetColor()" Value="@GetIntProp("Value", 50)" Max="@GetIntProp("Max", 100)" Class="@GetStringProp("Class")" />
                 }
-            </MudStepper>
-            break;
+                break;
 
-        case "pagination":
-            <MudPagination Selected="@GetIntProp("CurrentPage", 1)"
-                          Count="@GetIntProp("TotalPages", 1)"
-                          SelectedChanged="@HandlePageChange"
-                          Class="@GetStringProp("Class")" />
-            break;
+            case "skeleton":
+                <MudSkeleton SkeletonType="@GetSkeletonType()" Width="100%" Height="@GetStringProp("Height", "40px")" Class="@GetStringProp("Class")" />
+                break;
 
-        case "alert":
-            <MudAlert Severity="@GetSeverity()" Class="@GetStringProp("Class")">
-                @(Component.Label ?? GetStringProp("Message") ?? "")
-            </MudAlert>
-            break;
+            case "expansion":
+                <MudExpansionPanels MultiExpansion="@GetBoolProp("MultiExpansion")" Class="@GetStringProp("Class")">
+                    @RenderChildren()
+                </MudExpansionPanels>
+                break;
 
-        case "list":
-            <MudList T="string" Class="@GetStringProp("Class")">
-                @RenderChildren()
-            </MudList>
-            break;
+            case "expansionPanel":
+                <MudExpansionPanel Text="@(Component.Label ?? "")" Disabled="@IsDisabled()">
+                    @RenderChildren()
+                </MudExpansionPanel>
+                break;
 
-        case "listItem":
-            <MudListItem T="string" Text="@(Component.Label ?? "")" Disabled="@IsDisabled()" Class="@GetStringProp("Class")">
-                @RenderChildren()
-            </MudListItem>
-            break;
+            case "tooltip":
+                <MudTooltip Text="@(GetStringProp("Text") ?? Component.Label ?? "")" Placement="@GetPlacement()">
+                    @RenderChildren()
+                </MudTooltip>
+                break;
 
-        case "table":
-            <MudTable Items="@GetTableData()" Hover="true" Striped="true" Dense="true" Class="@GetStringProp("Class")">
-                <HeaderContent>
-                    @foreach (var col in GetTableColumns())
+            case "tabs":
+                <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Class="@GetStringProp("Class")">
+                    @if (Component.Children != null)
                     {
-                        <MudTh>@col.GetValueOrDefault("title")?.ToString()</MudTh>
+                        @foreach (var child in Component.Children)
+                        {
+                            <MudTabPanel Text="@(child.Label ?? "Tab")">
+                                @if (child.Children != null)
+                                {
+                                    @foreach (var grandChild in child.Children)
+                                    {
+                                        <DslComponentRenderer Component="grandChild" />
+                                    }
+                                }
+                            </MudTabPanel>
+                        }
                     }
-                </HeaderContent>
-                <RowTemplate>
-                    @foreach (var col in GetTableColumns())
+                </MudTabs>
+                break;
+
+            case "stepper":
+                <MudStepper @bind-ActiveIndex="_activeTabIndex" Class="@GetStringProp("Class")">
+                    @if (Component.Children != null)
                     {
-                        <MudTd DataLabel="@col.GetValueOrDefault("title")?.ToString()">
-                            @GetCellValue(context, col.GetValueOrDefault("dataIndex")?.ToString() ?? "")
-                        </MudTd>
+                        @foreach (var child in Component.Children)
+                        {
+                            <MudStep @key="child.Id" Text="@(child.Label ?? "Step")" Disabled="@IsDisabled()">
+                                @if (child.Children != null)
+                                {
+                                    @foreach (var grandChild in child.Children)
+                                    {
+                                        <DslComponentRenderer Component="grandChild" />
+                                    }
+                                }
+                            </MudStep>
+                        }
                     }
-                </RowTemplate>
-            </MudTable>
-            break;
+                </MudStepper>
+                break;
 
-        case "file":
-            <DslFileUploadRenderer Component="Component" />
-            break;
+            case "pagination":
+                <MudPagination Selected="@GetIntProp("CurrentPage", 1)"
+                              Count="@GetIntProp("TotalPages", 1)"
+                              SelectedChanged="@HandlePageChange"
+                              Class="@GetStringProp("Class")" />
+                break;
 
-        case "richText":
-            <DslRichTextRenderer Component="Component" />
-            break;
+            case "alert":
+                <MudAlert Severity="@GetSeverity()" Class="@GetStringProp("Class")">
+                    @(Component.Label ?? GetStringProp("Message") ?? "")
+                </MudAlert>
+                break;
 
-        case "chart":
-            <DslChartRenderer Component="Component" />
-            break;
+            case "list":
+                <MudList T="string" Class="@GetStringProp("Class")">
+                    @RenderChildren()
+                </MudList>
+                break;
 
-        default:
-            <MudAlert Severity="Severity.Warning">
-                未识别的组件类型: @Component.Type
-            </MudAlert>
-            break;
+            case "listItem":
+                <MudListItem T="string" Text="@(Component.Label ?? "")" Disabled="@IsDisabled()" Class="@GetStringProp("Class")">
+                    @RenderChildren()
+                </MudListItem>
+                break;
+
+            case "table":
+                <MudTable Items="@GetTableData()" Hover="true" Striped="true" Dense="true" Class="@GetStringProp("Class")">
+                    <HeaderContent>
+                        @foreach (var col in GetTableColumns())
+                        {
+                            <MudTh>@col.GetValueOrDefault("title")?.ToString()</MudTh>
+                        }
+                    </HeaderContent>
+                    <RowTemplate>
+                        @foreach (var col in GetTableColumns())
+                        {
+                            <MudTd DataLabel="@col.GetValueOrDefault("title")?.ToString()">
+                                @GetCellValue(context, col.GetValueOrDefault("dataIndex")?.ToString() ?? "")
+                            </MudTd>
+                        }
+                    </RowTemplate>
+                </MudTable>
+                break;
+
+            case "file":
+                <DslFileUploadRenderer Component="Component" />
+                break;
+
+            case "richText":
+                <DslRichTextRenderer Component="Component" />
+                break;
+
+            case "chart":
+                <DslChartRenderer Component="Component" />
+                break;
+
+            default:
+                <MudAlert Severity="Severity.Warning">
+                    未识别的组件类型: @Component.Type
+                </MudAlert>
+                break;
+        }
     }
 }
 
@@ -390,6 +313,7 @@
     [CascadingParameter] public DslRenderContext Context { get; set; } = null!;
     [Parameter] public DslComponent Component { get; set; } = null!;
 
+    private IDslComponentRenderer? _matchedRenderer;
     private MudForm? _formRef;
     private string _stringValue = string.Empty;
     private decimal _decimalValue;
@@ -399,6 +323,18 @@
     private int _intValue;
     private bool _isValid;
     private int _activeTabIndex;
+
+    protected override void OnParametersSet()
+    {
+        if (RendererRegistry.HasRenderer(Component.Type))
+        {
+            _matchedRenderer = RendererRegistry.Get(Component.Type);
+        }
+        else
+        {
+            _matchedRenderer = null;
+        }
+    }
 
     private bool CheckVisibility()
     {

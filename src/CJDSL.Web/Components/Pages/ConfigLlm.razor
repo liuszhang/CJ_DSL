@@ -5,76 +5,123 @@
 @inject SystemConfigService ConfigService
 @inject ISnackbar Snackbar
 
-<MudText Typo="Typo.h4" Class="mb-4">
-    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Class="mr-2" />LLM 源配置
-</MudText>
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Class="mr-2" />LLM 源配置
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@AddProvider"
+               StartIcon="@Icons.Material.Filled.Add">
+        添加提供商
+    </MudButton>
+</MudStack>
 
 <MudGrid>
     <MudItem xs="12" md="8">
-        <MudPaper Class="pa-6" Outlined="true">
-            <MudText Typo="Typo.h6" Class="mb-4">连接配置</MudText>
+        @if (_providers.Count == 0)
+        {
+            <MudPaper Class="pa-8" Outlined="true">
+                <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h6">暂无 LLM 提供商</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">点击右上角"添加提供商"开始配置</MudText>
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            @foreach (var (provider, index) in _providers.Select((p, i) => (p, i)))
+            {
+                <MudPaper Class="pa-4 mb-4" Outlined="true"
+                          Style="@(provider.IsActive ? "border: 2px solid var(--mud-palette-primary); background-color: var(--mud-palette-primary-lighten);" : "")">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            @if (provider.IsActive)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary">当前启用</MudChip>
+                            }
+                            <MudText Typo="Typo.h6">@(string.IsNullOrEmpty(provider.Name) ? $"提供商 {index + 1}" : provider.Name)</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">(@provider.Provider)</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="1">
+                            @if (!provider.IsActive)
+                            {
+                                <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary"
+                                           OnClick="@(() => SetActive(index))">
+                                    启用
+                                </MudButton>
+                            }
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                           Color="Color.Error" Title="删除"
+                                           OnClick="@(() => RemoveProvider(index))" />
+                        </MudStack>
+                    </MudStack>
 
-            <MudGrid>
-                <MudItem xs="12" md="6">
-                    <MudSelect T="string" Label="提供商" @bind-Value="_config.Provider" Variant="Variant.Outlined">
-                        <MudSelectItem Value="@("OpenAI")">OpenAI</MudSelectItem>
-                        <MudSelectItem Value="@("Ollama")">Ollama (本地)</MudSelectItem>
-                        <MudSelectItem Value="@("Custom")">自定义兼容 API</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
+                    <MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudTextField T="string" Label="显示名称" @bind-Value="provider.Name"
+                                          Variant="Variant.Outlined" Placeholder="如：GPT-4o、本地 Ollama" />
+                        </MudItem>
 
-                <MudItem xs="12" md="6">
-                    <MudTextField T="string" Label="模型名称" @bind-Value="_config.Model"
-                                  Variant="Variant.Outlined" Placeholder="gpt-4o-mini" />
-                </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudSelect T="string" Label="提供商类型" @bind-Value="provider.Provider" Variant="Variant.Outlined">
+                                <MudSelectItem Value="@("OpenAI")">OpenAI / 兼容 API</MudSelectItem>
+                                <MudSelectItem Value="@("Ollama")">Ollama (本地)</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
 
-                <MudItem xs="12">
-                    <MudTextField T="string" Label="API 基础地址" @bind-Value="_config.BaseUrl"
-                                  Variant="Variant.Outlined" Placeholder="https://api.openai.com/v1/"
-                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Link" />
-                </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField T="string" Label="模型名称" @bind-Value="provider.Model"
+                                          Variant="Variant.Outlined" Placeholder="gpt-4o-mini" />
+                        </MudItem>
 
-                <MudItem xs="12">
-                    <MudTextField T="string" Label="API Key" @bind-Value="_config.ApiKey"
-                                  Variant="Variant.Outlined" Placeholder="sk-..."
-                                  InputType="@(_showApiKey ? InputType.Text : InputType.Password)"
-                                  Adornment="Adornment.End"
-                                  AdornmentIcon="@(_showApiKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-                                  OnAdornmentClick="@(() => _showApiKey = !_showApiKey)" />
-                </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField T="string" Label="API 基础地址" @bind-Value="provider.BaseUrl"
+                                          Variant="Variant.Outlined" Placeholder="https://api.openai.com/v1/"
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Link" />
+                        </MudItem>
 
-                <MudItem xs="12" md="4">
-                    <MudNumericField T="float" Label="温度 (Temperature)" @bind-Value="_config.Temperature"
-                                     Variant="Variant.Outlined" Min="0f" Max="2f" Step="0.1f" />
-                </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField T="string" Label="API Key" @bind-Value="provider.ApiKey"
+                                          Variant="Variant.Outlined" Placeholder="sk-..."
+                                          InputType="@(_visibleApiKeys.Contains(index) ? InputType.Text : InputType.Password)"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@(_visibleApiKeys.Contains(index) ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                          OnAdornmentClick="@(() => ToggleApiKeyVisibility(index))" />
+                        </MudItem>
 
-                <MudItem xs="12" md="4">
-                    <MudNumericField T="int" Label="最大 Token 数" @bind-Value="_config.MaxTokens"
-                                     Variant="Variant.Outlined" Min="256" Max="128000" Step="256" />
-                </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudNumericField T="float" Label="温度" @bind-Value="provider.Temperature"
+                                             Variant="Variant.Outlined" Min="0f" Max="2f" Step="0.1f" />
+                        </MudItem>
 
-                <MudItem xs="12" md="4">
-                    <MudNumericField T="int" Label="超时时间（秒）" @bind-Value="_config.TimeoutSeconds"
-                                     Variant="Variant.Outlined" Min="10" Max="600" />
-                </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudNumericField T="int" Label="最大 Token" @bind-Value="provider.MaxTokens"
+                                             Variant="Variant.Outlined" Min="256" Max="128000" Step="256" />
+                        </MudItem>
 
-                <MudItem xs="12">
-                    <MudSwitch T="bool" @bind-Value="_config.Enabled" Label="启用 LLM 服务"
-                               Color="Color.Primary" />
-                </MudItem>
-            </MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudNumericField T="int" Label="超时（秒）" @bind-Value="provider.TimeoutSeconds"
+                                             Variant="Variant.Outlined" Min="10" Max="600" />
+                        </MudItem>
+                    </MudGrid>
 
-            <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2" Class="mt-6">
-                <MudButton Variant="Variant.Outlined" OnClick="@TestConnection"
-                           StartIcon="@Icons.Material.Filled.WifiFind" Loading="@_testing">
-                    测试连接
-                </MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveConfig"
-                           StartIcon="@Icons.Material.Filled.Save">
-                    保存配置
-                </MudButton>
-            </MudStack>
-        </MudPaper>
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2" Class="mt-2">
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                                   OnClick="@(() => TestConnection(index))"
+                                   StartIcon="@Icons.Material.Filled.WifiFind" Loading="@(_testingIndex == index)">
+                            测试连接
+                        </MudButton>
+                    </MudStack>
+
+                    @if (_testingIndex == index && _testResult != null)
+                    {
+                        <MudAlert Severity="@(_testSuccess ? Severity.Success : Severity.Error)" Dense="true" Class="mt-2">
+                            @_testResult
+                        </MudAlert>
+                    }
+                </MudPaper>
+            }
+        }
     </MudItem>
 
     <MudItem xs="12" md="4">
@@ -82,7 +129,10 @@
             <MudText Typo="Typo.h6" Class="mb-3">说明</MudText>
             <MudList T="string" Dense="true">
                 <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
-                    <MudText Typo="Typo.body2">LLM 用于根据元模型和自然语言描述自动生成 DSL JSON</MudText>
+                    <MudText Typo="Typo.body2">可配置多个 LLM 提供商，但同时只能启用一个</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
+                    <MudText Typo="Typo.body2">点击"启用"切换当前使用的提供商</MudText>
                 </MudListItem>
                 <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
                     <MudText Typo="Typo.body2">支持 OpenAI、Ollama 及所有 OpenAI 兼容 API</MudText>
@@ -90,81 +140,124 @@
                 <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
                     <MudText Typo="Typo.body2">温度越低输出越确定，推荐 0.3</MudText>
                 </MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
-                    <MudText Typo="Typo.body2">测试连接将发送一条简单请求验证服务可达性</MudText>
-                </MudListItem>
             </MudList>
-
-            @if (_testResult != null)
-            {
-                <MudDivider Class="my-3" />
-                <MudAlert Severity="@(_testSuccess ? Severity.Success : Severity.Error)" Dense="true">
-                    @_testResult
-                </MudAlert>
-            }
         </MudPaper>
     </MudItem>
 </MudGrid>
 
+<MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2" Class="mt-4">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveConfig"
+               StartIcon="@Icons.Material.Filled.Save">
+        保存配置
+    </MudButton>
+</MudStack>
+
 @code {
-    private LlmConnectionConfig _config = new();
-    private bool _showApiKey;
-    private bool _testing;
+    private List<LlmProviderConfig> _providers = new();
+    private HashSet<int> _visibleApiKeys = new();
+    private int _testingIndex = -1;
     private string? _testResult;
     private bool _testSuccess;
 
     protected override void OnInitialized()
     {
-        _config = ConfigService.GetLlmConfig();
+        var config = ConfigService.GetLlmConfig();
+        _providers = config.Providers.Select(p => new LlmProviderConfig
+        {
+            Name = p.Name,
+            Provider = p.Provider,
+            BaseUrl = p.BaseUrl,
+            ApiKey = p.ApiKey,
+            Model = p.Model,
+            Temperature = p.Temperature,
+            MaxTokens = p.MaxTokens,
+            TimeoutSeconds = p.TimeoutSeconds,
+            IsActive = p.IsActive
+        }).ToList();
+    }
+
+    private void AddProvider()
+    {
+        _providers.Add(new LlmProviderConfig
+        {
+            Name = $"提供商 {_providers.Count + 1}",
+            Provider = "OpenAI",
+            BaseUrl = "https://api.openai.com/v1/",
+            Model = "gpt-4o-mini",
+            IsActive = _providers.Count == 0
+        });
+    }
+
+    private void RemoveProvider(int index)
+    {
+        var wasActive = _providers[index].IsActive;
+        _providers.RemoveAt(index);
+
+        if (wasActive && _providers.Count > 0)
+        {
+            _providers[0].IsActive = true;
+        }
+    }
+
+    private void SetActive(int index)
+    {
+        foreach (var p in _providers) p.IsActive = false;
+        _providers[index].IsActive = true;
+    }
+
+    private void ToggleApiKeyVisibility(int index)
+    {
+        if (_visibleApiKeys.Contains(index))
+            _visibleApiKeys.Remove(index);
+        else
+            _visibleApiKeys.Add(index);
     }
 
     private void SaveConfig()
     {
-        ConfigService.UpdateLlmConfig(_config);
+        ConfigService.UpdateLlmConfig(new LlmConnectionConfig
+        {
+            Providers = _providers.Select(p => new LlmProviderConfig
+            {
+                Name = p.Name,
+                Provider = p.Provider,
+                BaseUrl = p.BaseUrl,
+                ApiKey = p.ApiKey,
+                Model = p.Model,
+                Temperature = p.Temperature,
+                MaxTokens = p.MaxTokens,
+                TimeoutSeconds = p.TimeoutSeconds,
+                IsActive = p.IsActive
+            }).ToList()
+        });
         Snackbar.Add("LLM 配置已保存", Severity.Success);
     }
 
-    private async Task TestConnection()
+    private async Task TestConnection(int index)
     {
-        _testing = true;
+        var provider = _providers[index];
+        _testingIndex = index;
         _testResult = null;
         StateHasChanged();
 
         try
         {
-            using var http = new HttpClient { BaseAddress = new Uri(_config.BaseUrl), Timeout = TimeSpan.FromSeconds(10) };
+            using var http = new HttpClient { BaseAddress = new Uri(provider.BaseUrl), Timeout = TimeSpan.FromSeconds(10) };
 
-            if (_config.Provider == "Ollama")
+            if (provider.Provider == "Ollama")
             {
                 var response = await http.GetAsync("api/tags");
-                if (response.IsSuccessStatusCode)
-                {
-                    _testSuccess = true;
-                    _testResult = "Ollama 服务连接成功";
-                }
-                else
-                {
-                    _testSuccess = false;
-                    _testResult = $"连接失败: {response.StatusCode}";
-                }
+                _testSuccess = response.IsSuccessStatusCode;
+                _testResult = response.IsSuccessStatusCode ? "Ollama 服务连接成功" : $"连接失败: {response.StatusCode}";
             }
             else
             {
-                // OpenAI 兼容 API - 尝试列出模型
-                if (!string.IsNullOrEmpty(_config.ApiKey))
-                    http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _config.ApiKey);
+                if (!string.IsNullOrEmpty(provider.ApiKey))
+                    http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", provider.ApiKey);
 
                 var response = await http.GetAsync("models");
-                if (response.IsSuccessStatusCode)
-                {
-                    _testSuccess = true;
-                    _testResult = "API 连接成功";
-                }
-                else
-                {
-                    _testSuccess = false;
-                    _testResult = $"连接失败: {response.StatusCode}";
-                }
+                _testSuccess = response.IsSuccessStatusCode;
+                _testResult = response.IsSuccessStatusCode ? "API 连接成功" : $"连接失败: {response.StatusCode}";
             }
         }
         catch (Exception ex)
@@ -174,7 +267,6 @@
         }
         finally
         {
-            _testing = false;
             StateHasChanged();
         }
     }
