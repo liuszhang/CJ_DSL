@@ -2,10 +2,8 @@
 
 @inherits LayoutComponentBase
 
-<MudThemeProvider />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+@* 注意：MudThemeProvider/MudDialogProvider/MudSnackbarProvider/MudPopoverProvider
+   由框架的 FrameworkLayout.razor 提供，此处不再重复声明。*@
 
 <MudLayout>
     <MudAppBar Elevation="1">

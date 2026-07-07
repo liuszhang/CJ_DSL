@@ -6,6 +6,8 @@ using CJDSL.Web.Components;
 using CJDSL.Web.Services;
 using Microsoft.AspNetCore.Components;
 using MudBlazor.Services;
+using CJCore.Framework.Api;
+using CJCore.Framework.Abstractions;
 
 namespace CJDSL.Web;
 
@@ -28,6 +30,15 @@ public class Program
             return new HttpClient { BaseAddress = new Uri(nav.BaseUri) };
         });
 
+        // ★ CJCore 框架注册（主题 + AppBar + 模块发现 + 日志）
+        builder.Services.AddCJCoreFramework(builder.Configuration, options =>
+        {
+            options.ProductName = "CJDSL";
+            options.EnableThemeSwitcher = true;
+            options.EnableLogDrawer = true;
+            options.BaseUrl = builder.Configuration["BaseUrl"];
+        });
+
         // CJDSL 各层服务
         builder.Services.AddCJDSLApi();
         builder.Services.AddCJDSLInfrastructure(builder.Configuration);
@@ -35,6 +46,10 @@ public class Program
 
         // 浮窗管理服务
         builder.Services.AddSingleton<FloatService>();
+
+        // ★ CJDSL 模块 + 菜单注册
+        builder.Services.AddSingleton<IModule, CJDSLModule>();
+        builder.Services.AddSingleton<IMenuService, CJDSLMenuService>();
 
         var app = builder.Build();
 

@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CJDSL.Api\CJDSL.Api.csproj" />
     <ProjectReference Include="..\CJDSL.Blazor\CJDSL.Blazor.csproj" />
+    <ProjectReference Include="..\..\..\CJCore\src\Framework\CJCore.Framework\CJCore.Framework.csproj" />
   </ItemGroup>
 
   <ItemGroup>

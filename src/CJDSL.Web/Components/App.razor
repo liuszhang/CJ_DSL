@@ -10,7 +10,7 @@
     <title>CJDSL - DSL 驱动 Web 应用系统</title>
 </head>
 <body>
-    <Routes @rendermode="RenderMode.InteractiveServer" />
+    <FrameworkRoutes />
     <div id="blazor-error-ui">
         <environment include="Staging,Production">
             发生错误。请刷新页面或联系管理员。
@@ -21,7 +21,7 @@
         <a href="" class="reload">重新加载</a>
         <a class="dismiss">🗙</a>
     </div>
-    <script src="_framework/blazor.web.js"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_content/CJDSL.Blazor/js/cjdsl-richtext.js"></script>
 </body>
