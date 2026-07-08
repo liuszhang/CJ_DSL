@@ -19,6 +19,8 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.AspNetCore.Components" Version="10.0.9" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.9" />
+    <!-- SignalR 客户端核心库：不属于 Microsoft.AspNetCore.App 共享框架，需随应用显式部署 -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />

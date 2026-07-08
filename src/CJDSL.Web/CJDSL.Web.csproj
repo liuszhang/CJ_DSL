@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <PackageReference Include="MudBlazor" />
+    <!-- 显式引入 SignalR 客户端，确保 Microsoft.AspNetCore.SignalR.Client(.Core) 随 Web 应用部署 -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
   </ItemGroup>
 
 </Project>
