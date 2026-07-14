@@ -1,3 +1,4 @@
+@using System.Diagnostics
 @using CJDSL.Blazor.Models
 @using MudBlazor
 
@@ -41,23 +42,31 @@
                 break;
 
             case "donut":
-                <MudChart T="double"
-                          ChartType="ChartType.Donut"
-                          InputData="@_donutData"
-                          InputLabels="@_donutLabels"
-                          @bind-SelectedIndex="_selectedIndex"
-                          Width="@GetStringProp("Width", "300px")"
-                          Height="@GetStringProp("Height", "300px")" />
+                Debug.WriteLine($"[DslChartRenderer] 渲染 Donut, Series count={_donutSeries.Count}, Labels.Length={_donutLabels.Length}");
+                <div style="width:100%; height:@GetStringProp("Height", "300px"); min-height:200px;">
+                    <MudChart T="double"
+                              ChartType="ChartType.Donut"
+                              ChartSeries="@_donutSeries"
+                              ChartLabels="@_donutLabels"
+                              @bind-SelectedIndex="_selectedIndex"
+                              Width="@GetStringProp("Width", "300px")"
+                              Height="@GetStringProp("Height", "300px")"
+                              MatchBoundsToSize="true" />
+                </div>
                 break;
 
             case "pie":
-                <MudChart T="double"
-                          ChartType="ChartType.Pie"
-                          InputData="@_donutData"
-                          InputLabels="@_donutLabels"
-                          @bind-SelectedIndex="_selectedIndex"
-                          Width="@GetStringProp("Width", "300px")"
-                          Height="@GetStringProp("Height", "300px")" />
+                Debug.WriteLine($"[DslChartRenderer] 渲染 Pie, Series count={_donutSeries.Count}, Labels.Length={_donutLabels.Length}");
+                <div style="width:100%; height:@GetStringProp("Height", "300px"); min-height:200px;">
+                    <MudChart T="double"
+                              ChartType="ChartType.Pie"
+                              ChartSeries="@_donutSeries"
+                              ChartLabels="@_donutLabels"
+                              @bind-SelectedIndex="_selectedIndex"
+                              Width="@GetStringProp("Width", "300px")"
+                              Height="@GetStringProp("Height", "300px")"
+                              MatchBoundsToSize="true" />
+                </div>
                 break;
 
             default:
@@ -100,13 +109,21 @@
     [Parameter] public DslComponent Component { get; set; } = null!;
 
     private List<ChartSeries<double>> _lineSeries = new();
-    private double[] _donutData = [];
+    private List<ChartSeries<double>> _donutSeries = [];
     private string[] _donutLabels = [];
     private string[] _xAxisLabels = [];
     private int _selectedIndex = -1;
 
-    protected override void OnInitialized() => LoadChartData();
-    protected override void OnParametersSet() => LoadChartData();
+    protected override void OnInitialized()
+    {
+        Debug.WriteLine($"[DslChartRenderer] OnInitialized, ChartType={GetStringProp("ChartType")}, Label={Component?.Label}");
+        LoadChartData();
+    }
+    protected override void OnParametersSet()
+    {
+        Debug.WriteLine($"[DslChartRenderer] OnParametersSet, ChartType={GetStringProp("ChartType")}, Label={Component?.Label}");
+        LoadChartData();
+    }
 
     private void LoadChartData()
     {
@@ -161,10 +178,22 @@
     private void LoadPieData()
     {
         var pieData = GetComponentProp<List<Dictionary<string, object>>>("PieData");
+        Debug.WriteLine($"[DslChartRenderer] LoadPieData, PieData is null? {pieData == null}, Props.HasPieData? {Component.Props?.ContainsKey("PieData")}");
         if (pieData != null)
         {
+            Debug.WriteLine($"[DslChartRenderer] PieData 条目数: {pieData.Count}");
             _donutLabels = pieData.Select(d => d.GetValueOrDefault("label")?.ToString() ?? "").ToArray();
-            _donutData = pieData.Select(d => Convert.ToDouble(d.GetValueOrDefault("value") ?? 0)).ToArray();
+            var values = pieData.Select(d => Convert.ToDouble(d.GetValueOrDefault("value") ?? 0)).ToArray();
+            _donutSeries = new List<ChartSeries<double>>
+            {
+                new ChartSeries<double>
+                {
+                    Name = Component.Label ?? "数据",
+                    Data = values
+                }
+            };
+            Debug.WriteLine($"[DslChartRenderer] _donutLabels=[{string.Join(", ", _donutLabels)}], values=[{string.Join(", ", values)}]");
+            Debug.WriteLine($"[DslChartRenderer] ChartSeries 构建完成, Series count={_donutSeries.Count}, Data count={_donutSeries.FirstOrDefault()?.Data.Count ?? 0}");
         }
         else
         {
@@ -172,7 +201,15 @@
             if (data is List<Dictionary<string, object>> list)
             {
                 _donutLabels = list.Select(d => d.GetValueOrDefault("label")?.ToString() ?? "").ToArray();
-                _donutData = list.Select(d => Convert.ToDouble(d.GetValueOrDefault("value") ?? 0)).ToArray();
+                var values = list.Select(d => Convert.ToDouble(d.GetValueOrDefault("value") ?? 0)).ToArray();
+                _donutSeries = new List<ChartSeries<double>>
+                {
+                    new ChartSeries<double>
+                    {
+                        Name = Component.Label ?? "数据",
+                        Data = values
+                    }
+                };
             }
         }
     }
@@ -198,7 +235,10 @@
     {
         var chartType = GetChartType();
         if (chartType == "donut" || chartType == "pie")
-            return _selectedIndex >= 0 && _selectedIndex < _donutData.Length ? _donutData[_selectedIndex].ToString() : "";
+        {
+            var data = _donutSeries.FirstOrDefault()?.Data;
+            return _selectedIndex >= 0 && data != null && _selectedIndex < data.Count ? data[_selectedIndex].ToString() : "";
+        }
         if (_lineSeries.Count > 0 && _selectedIndex >= 0)
         {
             var series = _lineSeries[0];

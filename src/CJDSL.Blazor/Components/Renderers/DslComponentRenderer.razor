@@ -1,3 +1,4 @@
+@using System.Diagnostics
 @using System.Text.RegularExpressions
 @using CJDSL.Blazor.Models
 @using Microsoft.JSInterop
@@ -297,6 +298,7 @@
                 break;
 
             case "chart":
+                Debug.WriteLine($"[DslComponentRenderer] 命中 chart 分支, Label={Component?.Label}");
                 <DslChartRenderer Component="Component" />
                 break;
 
@@ -326,6 +328,8 @@
 
     protected override void OnParametersSet()
     {
+        Debug.WriteLine($"[DslComponentRenderer] OnParametersSet, Type={Component?.Type}, Label={Component?.Label}, Props.Count={Component?.Props?.Count ?? 0}");
+
         if (RendererRegistry.HasRenderer(Component.Type))
         {
             _matchedRenderer = RendererRegistry.Get(Component.Type);
