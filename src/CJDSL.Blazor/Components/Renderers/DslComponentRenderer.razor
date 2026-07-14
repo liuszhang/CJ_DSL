@@ -13,7 +13,9 @@
 
 @if (CheckVisibility())
 {
-    @if (_matchedRenderer != null)
+    @try
+    {
+        @if (_matchedRenderer != null)
     {
         @_matchedRenderer.Render(Component, Context)
     }
@@ -309,6 +311,13 @@
                 break;
         }
     }
+    }
+    catch (Exception ex)
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-2 mb-2">
+            组件渲染失败 [@Component.Type]: @ex.Message
+        </MudAlert>
+    }
 }
 
 @code {
@@ -355,10 +364,11 @@
     private RenderFragment RenderChildren() => builder =>
     {
         if (Component.Children == null) return;
+        var childSeq = 0;
         foreach (var child in Component.Children)
         {
-            builder.OpenComponent(0, typeof(DslComponentRenderer));
-            builder.AddAttribute(1, "Component", child);
+            builder.OpenComponent(childSeq++, typeof(DslComponentRenderer));
+            builder.AddAttribute(childSeq++, "Component", child);
             builder.CloseComponent();
         }
     };

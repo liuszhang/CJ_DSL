@@ -28,6 +28,15 @@ public class DslRenderContext
     public object? RowData { get; set; }
     public Dictionary<string, object> ComponentRefs { get; } = new();
     public DslRenderContext? Parent { get; set; }
+
+    /// <summary>按钮操作回调：接收 Props["action"] 的值</summary>
+    public Func<string, Task>? OnAction { get; set; }
+
+    /// <summary>
+    /// 静态全局回调，替代 CascadingValue 传递 OnAction。
+    /// 在 MAUI BlazorWebView 中 CascadingValue 会导致崩溃，通过此静态字段绕过。
+    /// </summary>
+    public static Func<string, Task>? GlobalActionHandler { get; set; }
 }
 
 /// <summary>
