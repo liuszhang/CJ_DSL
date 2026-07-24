@@ -4,14 +4,6 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
-  <!-- 共享构建属性 -->
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>preview</LangVersion>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-  </PropertyGroup>
   <!-- 版本定义 -->
   <ItemGroup>
     <!-- .NET 10 预览版共享版本 -->

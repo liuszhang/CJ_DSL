@@ -1,6 +1,5 @@
 using CJDSL.Blazor.Models;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using MudBlazor;
 using System.Net.Http.Json;
@@ -10,9 +9,10 @@ using System.Text.RegularExpressions;
 namespace CJDSL.Blazor.Events;
 
 /// <summary>
-/// DSL 事件分发器（客户端实现）
+/// DSL 事件分发器（客户端实现）。
+/// DispatchAsync 返回 false 表示事件被取消或执行失败，chain 链路会据此中断后续步骤。
 /// </summary>
-public class DslEventDispatcher
+public class DslEventDispatcher : IDslEventDispatcher
 {
     private readonly HttpClient _httpClient;
     private readonly ISnackbar _snackbar;
@@ -34,7 +34,7 @@ public class DslEventDispatcher
         _jsRuntime = jsRuntime;
     }
 
-    public async Task DispatchAsync(DslEvent evt, DslComponent component, DslRenderContext context)
+    public async Task<bool> DispatchAsync(DslEvent evt, DslComponent component, DslRenderContext context)
     {
         if (evt.DebounceMs.HasValue && evt.DebounceMs.Value > 0)
             await Task.Delay(evt.DebounceMs.Value);
@@ -42,28 +42,30 @@ public class DslEventDispatcher
         if (evt.Confirm != null)
         {
             var confirmed = await ShowConfirmAsync(evt.Confirm);
-            if (!confirmed) return;
+            if (!confirmed) return false;
         }
 
         switch (evt.Handler)
         {
-            case "submit": await HandleSubmitAsync(evt, component, context); break;
-            case "apiCall": await HandleApiCallAsync(evt, component, context); break;
-            case "navigate": await HandleNavigateAsync(evt, context); break;
-            case "openModal": await HandleOpenModalAsync(evt, context); break;
-            case "closeModal": await HandleCloseModalAsync(evt, context); break;
-            case "refresh": await HandleRefreshAsync(evt, context); break;
-            case "setValue": await HandleSetValueAsync(evt, context); break;
-            case "showToast": await HandleShowToastAsync(evt); break;
-            case "export": await HandleExportAsync(evt, context); break;
-            case "validate": await HandleValidateAsync(evt, context); break;
-            case "reset": await HandleResetAsync(evt, context); break;
-            case "chain": await HandleChainAsync(evt, component, context); break;
-            default: _snackbar.Add($"未知 Handler: {evt.Handler}", Severity.Warning); break;
+            case "submit": return await HandleSubmitAsync(evt, component, context);
+            case "apiCall": return await HandleApiCallAsync(evt, component, context);
+            case "navigate": return await HandleNavigateAsync(evt, context);
+            case "openModal": return await HandleOpenModalAsync(evt, context);
+            case "closeModal": return await HandleCloseModalAsync(evt, context);
+            case "refresh": return await HandleRefreshAsync(evt, context);
+            case "setValue": return await HandleSetValueAsync(evt, context);
+            case "showToast": return await HandleShowToastAsync(evt);
+            case "export": return await HandleExportAsync(evt, context);
+            case "validate": return await HandleValidateAsync(evt, context);
+            case "reset": return await HandleResetAsync(evt, context);
+            case "chain": return await HandleChainAsync(evt, component, context);
+            default:
+                _snackbar.Add($"未知 Handler: {evt.Handler}", Severity.Warning);
+                return false;
         }
     }
 
-    private async Task HandleApiCallAsync(DslEvent evt, DslComponent component, DslRenderContext context)
+    private async Task<bool> HandleApiCallAsync(DslEvent evt, DslComponent component, DslRenderContext context)
     {
         var endpoint = ResolveTemplate(evt.Params?.GetValueOrDefault("endpoint")?.ToString() ?? "", context);
         var method = evt.Params?.GetValueOrDefault("method")?.ToString() ?? "GET";
@@ -102,16 +104,18 @@ public class DslEventDispatcher
             }
 
             _snackbar.Add("操作成功", Severity.Success);
+            return true;
         }
         catch (Exception ex)
         {
             _snackbar.Add($"操作失败: {ex.Message}", Severity.Error);
+            return false;
         }
     }
 
-    private async Task HandleChainAsync(DslEvent evt, DslComponent component, DslRenderContext context)
+    private async Task<bool> HandleChainAsync(DslEvent evt, DslComponent component, DslRenderContext context)
     {
-        if (evt.Params?.GetValueOrDefault("chain") is not List<Dictionary<string, object>> chain) return;
+        if (evt.Params?.GetValueOrDefault("chain") is not List<Dictionary<string, object>> chain) return true;
         foreach (var step in chain)
         {
             var stepEvent = new DslEvent
@@ -121,48 +125,106 @@ public class DslEventDispatcher
                 Params = step.GetValueOrDefault("params") as Dictionary<string, object>,
                 Confirm = step.ContainsKey("confirm") ? MapConfirm(step["confirm"]) : null
             };
-            await DispatchAsync(stepEvent, component, context);
+
+            // 链中任一步骤失败/取消，中断后续步骤
+            var ok = await DispatchAsync(stepEvent, component, context);
+            if (!ok) return false;
         }
+        return true;
     }
 
-    private async Task HandleSubmitAsync(DslEvent evt, DslComponent component, DslRenderContext context)
+    /// <summary>
+    /// 提交：校验表单 → 收集表单数据 → POST 到 endpoint（如提供）→ 触发 onSuccess 回调。
+    /// </summary>
+    private async Task<bool> HandleSubmitAsync(DslEvent evt, DslComponent component, DslRenderContext context)
     {
         var formId = evt.Params?.GetValueOrDefault("formId")?.ToString();
-        if (!string.IsNullOrEmpty(formId) && context.Forms.TryGetValue(formId, out var form))
+        if (string.IsNullOrEmpty(formId) || !context.Forms.TryGetValue(formId, out var formState))
         {
-            _snackbar.Add("提交表单", Severity.Info);
+            _snackbar.Add($"未找到表单: {formId}", Severity.Warning);
+            return false;
+        }
+
+        // 1. 校验（找到对应 MudForm 则执行真实校验）
+        if (!await ValidateFormAsync(formId, context))
+        {
+            _snackbar.Add("表单校验未通过，请检查输入", Severity.Warning);
+            return false;
+        }
+
+        // 2. 提交到 endpoint（未提供 endpoint 时仅完成校验和数据收集）
+        var endpoint = ResolveTemplate(evt.Params?.GetValueOrDefault("endpoint")?.ToString() ?? "", context);
+        if (string.IsNullOrEmpty(endpoint))
+        {
+            _snackbar.Add("表单校验通过", Severity.Success);
+            return true;
+        }
+
+        try
+        {
+            var payload = formState.GetValues();
+            using var response = await _httpClient.PostAsJsonAsync(endpoint, payload);
+            response.EnsureSuccessStatusCode();
+
+            // 3. 成功回调
+            if (evt.Params?.GetValueOrDefault("onSuccess") is List<Dictionary<string, object>> callbacks)
+            {
+                foreach (var cb in callbacks)
+                {
+                    await DispatchAsync(new DslEvent
+                    {
+                        Type = "callback",
+                        Handler = cb.GetValueOrDefault("handler")?.ToString() ?? "",
+                        Params = cb.GetValueOrDefault("params") as Dictionary<string, object>
+                    }, component, context);
+                }
+            }
+
+            _snackbar.Add("提交成功", Severity.Success);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _snackbar.Add($"提交失败: {ex.Message}", Severity.Error);
+            return false;
         }
     }
 
-    private async Task HandleNavigateAsync(DslEvent evt, DslRenderContext context)
+    private Task<bool> HandleNavigateAsync(DslEvent evt, DslRenderContext context)
     {
         var path = ResolveTemplate(evt.Params?.GetValueOrDefault("path")?.ToString() ?? "/", context);
         _navigation.NavigateTo(path);
+        return Task.FromResult(true);
     }
 
-    private async Task HandleOpenModalAsync(DslEvent evt, DslRenderContext context)
+    // openModal/closeModal/refresh/export 为 Phase 2 范围，当前保持占位提示
+    private Task<bool> HandleOpenModalAsync(DslEvent evt, DslRenderContext context)
     {
-        _snackbar.Add("打开模态框", Severity.Info);
+        _snackbar.Add("打开模态框（功能开发中）", Severity.Info);
+        return Task.FromResult(true);
     }
 
-    private async Task HandleCloseModalAsync(DslEvent evt, DslRenderContext context)
+    private Task<bool> HandleCloseModalAsync(DslEvent evt, DslRenderContext context)
     {
-        _snackbar.Add("关闭模态框", Severity.Info);
+        _snackbar.Add("关闭模态框（功能开发中）", Severity.Info);
+        return Task.FromResult(true);
     }
 
-    private async Task HandleRefreshAsync(DslEvent evt, DslRenderContext context)
+    private Task<bool> HandleRefreshAsync(DslEvent evt, DslRenderContext context)
     {
-        _snackbar.Add("刷新数据", Severity.Info);
+        _snackbar.Add("刷新数据（功能开发中）", Severity.Info);
+        return Task.FromResult(true);
     }
 
-    private async Task HandleSetValueAsync(DslEvent evt, DslRenderContext context)
+    private Task<bool> HandleSetValueAsync(DslEvent evt, DslRenderContext context)
     {
         var field = evt.Params?.GetValueOrDefault("field")?.ToString();
         var value = evt.Params?.GetValueOrDefault("value");
         if (!string.IsNullOrEmpty(field)) context.DataStore.Set(field, value);
+        return Task.FromResult(true);
     }
 
-    private async Task HandleShowToastAsync(DslEvent evt)
+    private Task<bool> HandleShowToastAsync(DslEvent evt)
     {
         var message = evt.Params?.GetValueOrDefault("message")?.ToString() ?? "操作成功";
         var severity = evt.Params?.GetValueOrDefault("severity")?.ToString() switch
@@ -173,23 +235,62 @@ public class DslEventDispatcher
             _ => Severity.Success
         };
         _snackbar.Add(message, severity);
+        return Task.FromResult(true);
     }
 
-    private async Task HandleExportAsync(DslEvent evt, DslRenderContext context)
+    private Task<bool> HandleExportAsync(DslEvent evt, DslRenderContext context)
     {
         _snackbar.Add("导出功能开发中", Severity.Info);
+        return Task.FromResult(true);
     }
 
-    private async Task HandleValidateAsync(DslEvent evt, DslRenderContext context)
+    /// <summary>
+    /// 校验：执行 MudForm 真实校验并反馈结果。
+    /// </summary>
+    private async Task<bool> HandleValidateAsync(DslEvent evt, DslRenderContext context)
     {
-        _snackbar.Add("验证通过", Severity.Success);
+        var formId = evt.Params?.GetValueOrDefault("formId")?.ToString();
+        if (string.IsNullOrEmpty(formId))
+        {
+            _snackbar.Add("validate 缺少 formId 参数", Severity.Warning);
+            return false;
+        }
+
+        var isValid = await ValidateFormAsync(formId, context);
+        if (isValid)
+            _snackbar.Add("验证通过", Severity.Success);
+        else
+            _snackbar.Add("表单校验未通过，请检查输入", Severity.Warning);
+        return isValid;
     }
 
-    private async Task HandleResetAsync(DslEvent evt, DslRenderContext context)
+    private async Task<bool> HandleResetAsync(DslEvent evt, DslRenderContext context)
     {
         var formId = evt.Params?.GetValueOrDefault("formId")?.ToString();
         if (!string.IsNullOrEmpty(formId) && context.Forms.TryGetValue(formId, out var form))
             form.Reset();
+
+        // 同步重置 MudForm 的 UI 校验状态
+        if (!string.IsNullOrEmpty(formId)
+            && context.ComponentRefs.TryGetValue(formId, out var refObj)
+            && refObj is MudForm mudForm)
+        {
+            await mudForm.ResetValidationAsync();
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// 执行 MudForm 校验；若渲染上下文中没有对应 MudForm 引用，视为校验通过（宽松处理）。
+    /// </summary>
+    private static async Task<bool> ValidateFormAsync(string formId, DslRenderContext context)
+    {
+        if (context.ComponentRefs.TryGetValue(formId, out var refObj) && refObj is MudForm mudForm)
+        {
+            await mudForm.ValidateAsync();
+            return mudForm.IsValid;
+        }
+        return true;
     }
 
     private string ResolveTemplate(string template, DslRenderContext context)
@@ -202,11 +303,18 @@ public class DslEventDispatcher
         });
     }
 
+    /// <summary>
+    /// 弹出 MudBlazor 原生确认对话框，返回用户真实选择（取消返回 false，中断后续事件链）。
+    /// </summary>
     private async Task<bool> ShowConfirmAsync(DslConfirm confirm)
     {
-        _snackbar.Add(confirm.Message, Severity.Info);
-        await Task.Delay(100);
-        return true;
+        var result = await _dialogService.ShowMessageBoxAsync(
+            confirm.Title,
+            confirm.Message,
+            yesText: confirm.ConfirmText,
+            cancelText: confirm.CancelText);
+
+        return result == true;
     }
 
     private static DslConfirm? MapConfirm(object? confirmObj)

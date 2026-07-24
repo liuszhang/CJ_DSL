@@ -34,16 +34,21 @@ public static class InfrastructureServiceExtensions
 
             services.AddSingleton<IDslRepository, SqliteDslRepository>();
             services.AddSingleton<IMetaModelRepository, SqliteMetaModelRepository>();
+            services.AddSingleton<IBusinessDataService, SqliteBusinessDataService>();
         }
         else
         {
             services.AddSingleton<IMetaModelRepository, InMemoryMetaModelRepository>();
             services.AddSingleton<IDslRepository, InMemoryDslRepository>();
+            services.AddSingleton<IBusinessDataService, InMemoryBusinessDataService>();
         }
 
         // 生成器
-        services.AddSingleton<IDslGenerator, TemplateDslGenerator>();
+        services.AddSingleton<TemplateDslGenerator>();
+        services.AddSingleton<IDslGenerator>(sp => sp.GetRequiredService<TemplateDslGenerator>());
         services.AddScoped<LlmDslGenerator>();
+        // 生成器解析器：按 provider（template|llm）动态选择，LLM 未配置时自动降级模板并告警
+        services.AddScoped<IDslGeneratorResolver, DslGeneratorResolver>();
 
         // 缓存
         services.AddSingleton<IDslCache, InMemoryDslCache>();

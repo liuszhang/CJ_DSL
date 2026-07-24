@@ -21,42 +21,65 @@ public static class DslEndpoints
             .WithTags("DSL")
             .WithOpenApi();
 
-        // 基于元模型生成 DSL
+        // 基于元模型生成 DSL（?provider=llm|template，默认 template）
         group.MapPost("/generate", async (
             GenerateDslRequest request,
+            [FromQuery] string? provider,
             IMediator mediator,
             CancellationToken ct) =>
         {
+            var options = request.Options ?? new GenerateOptions();
+            if (!string.IsNullOrWhiteSpace(provider))
+                options.Provider = provider;
+
             var command = new GenerateDslCommand(
                 request.MetaObjectCode,
                 request.Layout,
                 request.UserContext,
-                request.Options);
+                options);
             var result = await mediator.Send(command, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
         });
 
-        // 基于自然语言生成 DSL
+        // 基于自然语言生成 DSL（默认走 LLM，未配置 LLM 时降级模板解析）
         group.MapPost("/generate-from-nlp", async (
             GenerateFromNlpRequest request,
+            [FromQuery] string? provider,
             IMediator mediator,
             CancellationToken ct) =>
         {
-            var result = Result.Success<DslPage>(new DslPage { Title = "NLP 生成页面", Layout = "form" });
+            var options = request.Options ?? new GenerateOptions();
+            if (!string.IsNullOrWhiteSpace(provider))
+                options.Provider = provider;
+
+            var command = new GenerateDslFromNlpCommand(
+                request.Description,
+                request.UserContext,
+                options);
+            var result = await mediator.Send(command, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value)
-                : Results.BadRequest(new { error = result.Error });
+                : Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
         });
 
-        // 基于当前上下文动态调整 DSL
+        // 基于当前上下文动态调整 DSL（默认走 LLM，未配置 LLM 时降级规则适配）
         group.MapPost("/adapt", async (
             AdaptDslRequest request,
+            [FromQuery] string? provider,
             IMediator mediator,
             CancellationToken ct) =>
         {
-            return Results.Ok(request.BaseDsl);
+            var command = new AdaptDslCommand(
+                request.BaseDsl,
+                request.UserContext,
+                request.DataContext,
+                provider);
+            var result = await mediator.Send(command, ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
         });
 
         // 获取页面 DSL

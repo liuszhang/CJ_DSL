@@ -73,6 +73,7 @@ else
 
                 _dispatcher = new DslEventDispatcher(
                     HttpClient, Snackbar, Navigation, DialogService, JSRuntime);
+                _context.EventDispatcher = _dispatcher;
 
                 if (InitialData != null)
                 {

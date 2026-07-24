@@ -12,21 +12,25 @@ namespace CJDSL.Application.Dsl.Commands;
 public record AdaptDslCommand(
     DslPage BaseDsl,
     UserContext UserContext,
-    Dictionary<string, object>? DataContext = null) : IRequest<Result<DslPage>>;
+    Dictionary<string, object>? DataContext = null,
+    string? Provider = null) : IRequest<Result<DslPage>>;
 
 public class AdaptDslCommandHandler : IRequestHandler<AdaptDslCommand, Result<DslPage>>
 {
-    private readonly IDslGenerator _dslGenerator;
+    private readonly IDslGeneratorResolver _generatorResolver;
 
-    public AdaptDslCommandHandler(IDslGenerator dslGenerator)
+    public AdaptDslCommandHandler(IDslGeneratorResolver generatorResolver)
     {
-        _dslGenerator = dslGenerator;
+        _generatorResolver = generatorResolver;
     }
 
     public async Task<Result<DslPage>> Handle(AdaptDslCommand request, CancellationToken ct)
     {
         try
         {
+            // 适配链路默认走 LLM（未配置 LLM 时由 Resolver 自动降级为模板规则适配）
+            var generator = _generatorResolver.Resolve(request.Provider, DslGeneratorProviders.Llm);
+
             var dataContext = new DataContext();
             if (request.DataContext != null)
             {
@@ -34,7 +38,7 @@ public class AdaptDslCommandHandler : IRequestHandler<AdaptDslCommand, Result<Ds
                     dataContext.Values[kv.Key] = kv.Value;
             }
 
-            var adapted = await _dslGenerator.AdaptAsync(
+            var adapted = await generator.AdaptAsync(
                 request.BaseDsl,
                 request.UserContext,
                 dataContext,

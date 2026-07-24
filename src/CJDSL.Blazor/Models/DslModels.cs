@@ -15,6 +15,15 @@ public enum TargetPlatform
 }
 
 /// <summary>
+/// DSL 事件派发器接口（避免 Models 直接依赖具体实现）
+/// </summary>
+public interface IDslEventDispatcher
+{
+    /// <summary>派发事件。返回 false 表示事件被中断/失败（用于中断事件链）</summary>
+    Task<bool> DispatchAsync(DslEvent evt, DslComponent component, DslRenderContext context);
+}
+
+/// <summary>
 /// DSL 渲染上下文
 /// </summary>
 public class DslRenderContext
@@ -28,6 +37,58 @@ public class DslRenderContext
     public object? RowData { get; set; }
     public Dictionary<string, object> ComponentRefs { get; } = new();
     public DslRenderContext? Parent { get; set; }
+
+    /// <summary>页面级事件派发器（由 DslPageRenderer 创建并注入）</summary>
+    public IDslEventDispatcher? EventDispatcher { get; set; }
+
+    /// <summary>
+    /// 注册表单：以 form 组件的 Id 为 formId，登记其后代中声明了 FieldName 的字段，
+    /// 使输入组件的值变更能自动回写对应 FormState。
+    /// </summary>
+    public FormState RegisterForm(DslComponent formComponent)
+    {
+        if (!Forms.TryGetValue(formComponent.Id, out var state))
+        {
+            state = new FormState();
+            Forms[formComponent.Id] = state;
+        }
+
+        foreach (var descendant in formComponent.Descendants())
+        {
+            if (!string.IsNullOrEmpty(descendant.FieldName))
+                state.RegisterField(descendant.FieldName);
+        }
+        return state;
+    }
+
+    /// <summary>
+    /// 写入字段值：同时更新 DataStore（供表达式/模板消费）与所有登记了该字段的 FormState（供 apiCall/submit 提交）。
+    /// </summary>
+    public void SetFieldValue(string fieldName, object? value)
+    {
+        if (string.IsNullOrEmpty(fieldName)) return;
+
+        DataStore.Set($"data.{fieldName}", value);
+
+        foreach (var form in Forms.Values)
+        {
+            if (form.HasField(fieldName))
+                form.SetValue(fieldName, value);
+        }
+    }
+
+    /// <summary>读取字段初始值（优先 FormState，其次 DataStore）</summary>
+    public object? GetFieldValue(string fieldName)
+    {
+        if (string.IsNullOrEmpty(fieldName)) return null;
+
+        foreach (var form in Forms.Values)
+        {
+            var value = form.GetValue(fieldName);
+            if (value != null) return value;
+        }
+        return DataStore.Get($"data.{fieldName}");
+    }
 
     /// <summary>按钮操作回调：接收 Props["action"] 的值</summary>
     public Func<string, Task>? OnAction { get; set; }
@@ -108,6 +169,13 @@ public class DataChangedEventArgs : EventArgs
 public class FormState
 {
     private readonly Dictionary<string, object> _values = new();
+    private readonly HashSet<string> _fields = new();
+
+    /// <summary>登记表单包含的字段名（用于字段值变更时精确回写所属表单）</summary>
+    public void RegisterField(string fieldName) => _fields.Add(fieldName);
+
+    /// <summary>该表单是否包含指定字段</summary>
+    public bool HasField(string fieldName) => _fields.Contains(fieldName);
 
     public void SetValue(string fieldName, object? value)
     {

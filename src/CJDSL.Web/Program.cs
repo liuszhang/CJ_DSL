@@ -65,6 +65,7 @@ public class Program
 
         app.UseCJDSLApi();
         app.MapDslEndpoints();
+        app.MapBusinessApiEndpoints();
 
         // Blazor 组件
         app.MapRazorComponents<App>()

@@ -19,23 +19,26 @@ public record GenerateDslCommand(
 public class GenerateDslCommandHandler : IRequestHandler<GenerateDslCommand, Result<DslPage>>
 {
     private readonly IMetaModelRepository _metaModelRepo;
-    private readonly IDslGenerator _dslGenerator;
+    private readonly IDslGeneratorResolver _generatorResolver;
     private readonly IDslCache _cache;
 
     public GenerateDslCommandHandler(
         IMetaModelRepository metaModelRepo,
-        IDslGenerator dslGenerator,
+        IDslGeneratorResolver generatorResolver,
         IDslCache cache)
     {
         _metaModelRepo = metaModelRepo;
-        _dslGenerator = dslGenerator;
+        _generatorResolver = generatorResolver;
         _cache = cache;
     }
 
     public async Task<Result<DslPage>> Handle(GenerateDslCommand request, CancellationToken ct)
     {
-        // 构建缓存键
-        var cacheKey = $"dsl:{request.MetaObjectCode}:{request.Layout}:{string.Join(",", request.UserContext.Roles)}:{request.Options?.DeviceType ?? "Desktop"}:{request.Options?.TargetPlatform ?? TargetPlatform.Web}";
+        // 元模型生成链路：provider 为空时默认走模板生成器
+        var generator = _generatorResolver.Resolve(request.Options?.Provider, DslGeneratorProviders.Template);
+
+        // 构建缓存键（包含 provider，避免模板/LLM 结果互相污染）
+        var cacheKey = $"dsl:{request.MetaObjectCode}:{request.Layout}:{string.Join(",", request.UserContext.Roles)}:{request.Options?.DeviceType ?? "Desktop"}:{request.Options?.TargetPlatform ?? TargetPlatform.Web}:{request.Options?.Provider ?? DslGeneratorProviders.Template}";
 
         // 尝试命中缓存
         var cached = await _cache.GetAsync<DslPage>(cacheKey, ct);
@@ -49,10 +52,10 @@ public class GenerateDslCommandHandler : IRequestHandler<GenerateDslCommand, Res
         // 根据布局类型生成 DSL
         DslPage dsl = request.Layout.ToLower() switch
         {
-            "list" => await _dslGenerator.GenerateListAsync(metaObject, request.Options ?? new GenerateOptions(), ct),
-            "detail" => await _dslGenerator.GenerateDetailAsync(metaObject, request.Options ?? new GenerateOptions(), ct),
-            "dashboard" => await _dslGenerator.GenerateDashboardAsync(null!, request.Options ?? new GenerateOptions(), ct),
-            _ => await _dslGenerator.GenerateFormAsync(metaObject, request.Options ?? new GenerateOptions(), ct)
+            "list" => await generator.GenerateListAsync(metaObject, request.Options ?? new GenerateOptions(), ct),
+            "detail" => await generator.GenerateDetailAsync(metaObject, request.Options ?? new GenerateOptions(), ct),
+            "dashboard" => await generator.GenerateDashboardAsync(null!, request.Options ?? new GenerateOptions(), ct),
+            _ => await generator.GenerateFormAsync(metaObject, request.Options ?? new GenerateOptions(), ct)
         };
 
         // 缓存结果
