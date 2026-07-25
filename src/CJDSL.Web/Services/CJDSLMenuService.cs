@@ -41,15 +41,6 @@ public class CJDSLMenuService : IMenuService
             },
             new MenuItem
             {
-                Text = "LLM 源配置",
-                Href = "/config/llm",
-                Icon = Icons.Material.Filled.SmartToy,
-                Match = "Prefix",
-                Order = 40,
-                GroupName = "系统管理"
-            },
-            new MenuItem
-            {
                 Text = "提示词配置",
                 Href = "/config/prompt",
                 Icon = Icons.Material.Filled.Code,

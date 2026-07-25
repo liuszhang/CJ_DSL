@@ -17,11 +17,16 @@
     </PackageReference>
     <PackageReference Include="Moq" />
     <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CJDSL.Domain\CJDSL.Domain.csproj" />
     <ProjectReference Include="..\CJDSL.Infrastructure\CJDSL.Infrastructure.csproj" />
+    <!-- 模块 J：显式引用 CJCore LLM 程序集，避免依赖传递引用在 IDE 设计时构建中解析失败 -->
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.Abstractions\CJCore.LLM.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.LLMClient\CJCore.LLM.LLMClient.csproj" />
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.Structured\CJCore.LLM.Structured.csproj" />
   </ItemGroup>
 
 </Project>

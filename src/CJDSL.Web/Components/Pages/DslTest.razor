@@ -2,7 +2,11 @@
 @rendermode RenderMode.InteractiveServer
 @using CJDSL.Blazor.Models
 @using CJDSL.Blazor.Components.Renderers
+@using CJDSL.Domain
+@using CJDSL.Domain.Interfaces
+@using CJDSL.Infrastructure.Services
 @inject ISnackbar Snackbar
+@inject IDslGeneratorResolver GeneratorResolver
 
 <style>
     .dsl-test-left, .dsl-test-right {
@@ -37,6 +41,9 @@
                 <MudStack Row="true" Spacing="1">
                     <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@LoadSampleDsl">
                         加载示例
+                    </MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AutoAwesome" OnClick="@OpenLlmDialog">
+                        LLM 测试
                     </MudButton>
                     <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@ClearEditor">
                         清空
@@ -96,12 +103,42 @@
     </MudItem>
 </MudGrid>
 
+<MudOverlay Visible="_llmDialogOpen" DarkBackground="true" LockScroll="true" ZIndex="9999">
+    <MudPaper Class="pa-6" Elevation="3" Style="width: 560px; max-width: 92vw;">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Class="mr-2" Color="Color.Primary" />LLM 生成 DSL
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Default">
+                输入自然语言描述，确认后调用大模型生成 DSL JSON 并填入左侧输入框（用于测试 LLM 生成流程）。
+            </MudText>
+            <MudTextField T="string" @bind-Value="_nlpInput" Lines="5" Variant="Variant.Outlined"
+                          Placeholder="例如：一个设备报修表单，包含报修单号、设备名称、设备类型、报修日期、优先级、故障描述等字段，提交后提示成功。"
+                          Disabled="_generating" Immediate="true" />
+            <MudStack Row="true" Justify="Justify.SpaceBetween" Spacing="2">
+                <MudButton Variant="Variant.Text" OnClick="@CloseLlmDialog" Disabled="_generating">取消</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@ConfirmLlmGenerate"
+                          Disabled="_generating || string.IsNullOrWhiteSpace(_nlpInput)">
+                    @if (_generating)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /><span>生成中...</span>
+                    }
+                    else
+                    {
+                        <span>确认生成</span>
+                    }
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+</MudOverlay>
+
 @code {
     private string _dslInput = string.Empty;
     private CJDSL.Blazor.Models.DslPage? _dslPage;
     private string? _renderError;
 
-    private readonly UserContext _user = new()
+    private readonly CJDSL.Blazor.Models.UserContext _user = new()
     {
         UserId = "demo",
         UserName = "演示用户",
@@ -222,5 +259,79 @@
         }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
 
         RenderDsl();
+    }
+
+    // ---- LLM 测试：自然语言 → DSL JSON ----
+    private bool _llmDialogOpen;
+    private string _nlpInput = string.Empty;
+    private bool _generating;
+
+    private void OpenLlmDialog()
+    {
+        _nlpInput = string.Empty;
+        _llmDialogOpen = true;
+    }
+
+    private void CloseLlmDialog()
+    {
+        if (_generating) return;
+        _llmDialogOpen = false;
+    }
+
+    private async Task ConfirmLlmGenerate()
+    {
+        if (string.IsNullOrWhiteSpace(_nlpInput) || _generating) return;
+        _generating = true;
+        try
+        {
+            // 强制走 LLM 生成器；若未配置默认模型，解析器会降级为模板生成器
+            var generator = GeneratorResolver.Resolve(DslGeneratorProviders.Llm);
+            if (generator is not LlmDslGenerator)
+            {
+                Snackbar.Add("LLM 未配置默认模型，请先到「LLM 配置」页面设置后再试", Severity.Warning);
+                return;
+            }
+
+            var domainUser = new CJDSL.Domain.UserContext
+            {
+                UserId = _user.UserId,
+                UserName = _user.UserName,
+                Roles = _user.Roles,
+                Permissions = _user.Permissions,
+                Department = _user.Department,
+                TenantId = _user.TenantId
+            };
+            var options = new CJDSL.Domain.GenerateOptions
+            {
+                Provider = DslGeneratorProviders.Llm,
+                Layout = "form",
+                TargetPlatform = CJDSL.Domain.TargetPlatform.Web,
+                DeviceType = "Desktop"
+            };
+
+            var dsl = await generator.GenerateFromNlpAsync(_nlpInput, domainUser, options);
+            if (dsl == null || dsl.Title == "生成失败")
+            {
+                Snackbar.Add("LLM 生成失败，请检查 LLM 配置或网络后重试", Severity.Error);
+                return;
+            }
+
+            _dslInput = System.Text.Json.JsonSerializer.Serialize(dsl, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            });
+            _llmDialogOpen = false;
+            RenderDsl();
+            Snackbar.Add("LLM 生成完成，已填入 DSL JSON 输入框", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"生成异常: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _generating = false;
+        }
     }
 }

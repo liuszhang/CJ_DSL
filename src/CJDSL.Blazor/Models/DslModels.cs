@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
+using System.Text.Json.Serialization;
+using CJDSL.Domain;
 
 namespace CJDSL.Blazor.Models;
 
 /// <summary>
 /// 目标渲染平台
 /// </summary>
+[JsonConverter(typeof(BlazorTargetPlatformConverter))]
 public enum TargetPlatform
 {
     Web,
@@ -13,6 +16,13 @@ public enum TargetPlatform
     Maui,
     React,
     Vue
+}
+
+/// <summary>
+/// TargetPlatform 的 JSON 转换器（字符串/数字均可，未知值回退 Web）。
+/// </summary>
+public sealed class BlazorTargetPlatformConverter : FlexibleEnumConverter<CJDSL.Blazor.Models.TargetPlatform>
+{
 }
 
 /// <summary>

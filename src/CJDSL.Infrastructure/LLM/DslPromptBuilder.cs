@@ -15,6 +15,7 @@ public interface IDslPromptBuilder
     string BuildFormPrompt(M1_Object metaObject, GenerateOptions options);
     string BuildListPrompt(M1_Object metaObject, GenerateOptions options);
     string BuildNlpPrompt(string description, UserContext user, GenerateOptions options);
+    string BuildDashboardPrompt(M4_Scene scene, GenerateOptions options);
 }
 
 public class DslPromptBuilder : IDslPromptBuilder
@@ -163,6 +164,32 @@ public class DslPromptBuilder : IDslPromptBuilder
 4. 输出 DslPage 中必须包含 ""targetPlatform"": ""{options.TargetPlatform}""
 5. 生成完整的 CJDSL 组件树
 6. 输出必须是纯 JSON
+";
+    }
+
+    public string BuildDashboardPrompt(M4_Scene scene, GenerateOptions options)
+    {
+        return $@"
+根据以下业务场景元模型，生成一份仪表盘（dashboard）布局的 CJDSL JSON。
+
+## 场景信息
+- 场景名称：{scene?.Name ?? "数据仪表盘"}
+- 场景编码：{scene?.Code ?? "default"}
+- 描述：{scene?.Description ?? ""}
+
+## 用户上下文
+- 角色：{string.Join(", ", options.Roles)}
+- 目标平台：{options.TargetPlatform}
+- 布局偏好：{options.Preference.Density}
+
+## 生成要求
+1. layout: ""dashboard""
+2. 输出 DslPage 中必须包含 ""targetPlatform"": ""{options.TargetPlatform}""
+3. 顶部一排统计卡片（grid, Spacing=3），每张卡片用 card 包裹一个关键指标（如业务对象数、枚举项数、字典项数、今日待办等），用 textDisplay 展示标签与数值
+4. 一个趋势图卡片（card 内含 chart 组件，ChartType=line，Title 描述趋势）
+5. 一个最近记录卡片（card 内含 list，含若干 listItem 占位）
+6. 正确嵌套：grid > card > textDisplay / chart / list
+7. 输出必须是纯 JSON，不要包含 Markdown 代码块标记
 ";
     }
 

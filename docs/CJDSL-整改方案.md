@@ -228,7 +228,7 @@ AIGC:
 |------|--------|------|------|
 | G1 | 实现 Dashboard 模板生成 | `TemplateDslGenerator.cs` | 基于 M4 场景/元模型统计生成卡片式仪表盘（统计卡片 + 图表 + 列表） |
 | G2 | 实现 Dashboard LLM 生成 | `LlmDslGenerator.cs` | 传入 M4 场景结构，由 LLM 生成 Dashboard DSL |
-| G3 | 修复 datetime → MudDateTimePicker | `DslComponentRenderer.razor:79-86` | 替换组件，支持日期+时间选择 |
+| G3 | datetime 用 MudDatePicker+MudTimePicker 组合（MudBlazor 9.6.0 无 MudDateTimePicker 组件，组合已实现日期+时间取值，无需改） | `DslComponentRenderer.razor:83-95` | 保持组合控件，支持日期+时间选择 |
 | G4 | 清理 Debug.WriteLine | `DslComponentRenderer.razor` | 替换为 `ILogger.LogDebug` 或删除 |
 
 **预估工时**：2 人天
@@ -265,7 +265,39 @@ AIGC:
 
 ---
 
-### 2.9 模块 I：文档与规范（对应 G15、G13 部分）
+### 2.9 模块 J：LLM 模块收敛到 CJCore（新增，2026-07-25）
+
+**现状**：CJDSL 在 `CJDSL.Infrastructure/LLM/` 自建了一整套 LLM 客户端（`ILLMClient`/`LLMClientProvider`/`OpenAIClient`/`OllamaClient`/`DslResponseParser`），与 CJCore 共享 LLM 模块（`src/Modules/LLM/` 9 个项目）完全平行——重复造轮子且能力更弱：无结构化输出、无自动重试、无流式/工具调用抽象；配置存 `system-config.json`，自建配置页 `/config/llm`。
+
+**决策记录**（2026-07-25 用户拍板）：
+- 收敛深度：**B 全套收敛**（客户端栈 + DB 配置 + CJCore 配置管理 UI），而非仅换客户端。
+- 旧配置页处置：**删除** `ConfigLlm.razor` 与"LLM 源配置"菜单，全面换用 CJCore 的 `/llm-config` 配置页；`system-config.json` 中已激活 Provider 首次启动自动迁入 DB（幂等）。
+- 关键事实：CJCore Data 模块是自包含独立 SQLite 库（`DataDbContext` + `EnsureDataDbCreatedAsync` + `ISeedDataProvider`），**不影响** CJDSL 现有 `UseSqlite=false` 内存业务存储。
+
+**改动清单**：
+
+| 序号 | 改动项 | 说明 |
+|------|--------|------|
+| J1 | 删除自建客户端栈 | 删 `ILLMClient.cs`（Domain）、`OpenAIClient`/`OllamaClient`/`LLMClientProvider`/`DslResponseParser`（Infra） |
+| J2 | 引入 CJCore LLM 引用 | Infrastructure 引 `CJCore.LLM.Abstractions/LLMClient/Structured`；Web 引 `CJCore.Modules.LLM`（传递带 Model/Api/UI/Data） |
+| J3 | DB 配置客户端适配器 | 新写 `DbConfiguredLLMClient : ILLMClient`：经 `ILLMConfigReader`(DB) 取 Endpoint/ApiKey/Model 填入 `ChatRequest`，委托 CJCore 通用 `LLMClient` |
+| J4 | 改写 `LlmDslGenerator` | 用 `IStructuredLLMClient.SendStructuredAsync<DslPage>()` 取代"裸文本 + 手工解析"，失败仍走 fallback 页 |
+| J5 | 改写 `DslGeneratorResolver` | 可用性判断从 `SystemConfig.GetActive()` 改为 DB 默认模型是否配置 |
+| J6 | Web 宿主接入模块 | `AddCJCoreLLM(...)` + `MapCJCoreLLM()` + `EnsureDataDbCreatedAsync()` + `RunSeedDataAsync()`；UI 路由/菜单经 `IModule` 自动发现 |
+| J7 | 旧配置页下线 + 配置迁库 | 删 `ConfigLlm.razor` 与菜单项；`ISeedDataProvider` 实现一次性幂等迁移 json→DB 并设默认模型 |
+| J8 | 单测更新 | `SystemConfig.Llm` 保留类型但不再被消费；补 J3/J4 相关单测 |
+
+**预估工时**：1.5 人天
+
+**验收标准**：
+- 全解构建 0 错误；既有单测全绿
+- `/llm-config` 页面可管理 Provider/模型/MCP，设置的默认模型被 DSL 生成链路实际消费
+- `provider=llm` 生成请求：DB 有默认模型走 LLM（含结构化解析），无则降级模板
+- 旧 `/config/llm` 路由不存在；`system-config.json` 旧配置首启自动入库
+
+---
+
+### 2.10 模块 I：文档与规范（对应 G15、G13 部分）
 
 **现状**：docs 仅含一份缺口分析文档。WPF 渲染器无文档，元模型使用指南缺失。
 
@@ -326,6 +358,7 @@ AIGC:
 
 | 阶段 | 任务 | 工日 | 交付物 |
 |------|------|------|--------|
+| 3.0 | J1-J8：LLM 模块收敛到 CJCore | 1.5 | 客户端栈/配置/UI 全面复用 CJCore，删自建实现 |
 | 3.1 | H3-H7：完整测试体系 | 3 | 单测覆盖率 > 70%，E2E 可跑 |
 | 3.2 | I1-I4：文档补齐 | 2 | 完整的使用/配置/扩展文档 |
 | 3.3 | F5：dataGrid/tree/carousel 等组件 | 5 | 常用组件补齐 |

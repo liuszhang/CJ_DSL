@@ -8,7 +8,13 @@
   <ItemGroup>
     <ProjectReference Include="..\CJDSL.Api\CJDSL.Api.csproj" />
     <ProjectReference Include="..\CJDSL.Blazor\CJDSL.Blazor.csproj" />
+    <ProjectReference Include="..\CJDSL.Infrastructure\CJDSL.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\CJCore\src\Framework\CJCore.Framework\CJCore.Framework.csproj" />
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.Modules.LLM\CJCore.Modules.LLM.csproj" />
+    <!-- 模块 J：显式引用 Data.Model，提供 AddCJCoreLLM 的 dataOptions 参数类型 DataModuleOptions -->
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\Data\CJCore.Modules.Data.Model\CJCore.Modules.Data.Model.csproj" />
+    <!-- 模块 J：显式引用 Data.Api，提供 EnsureDataDbCreatedAsync / RunSeedDataAsync 扩展方法（同为 CJCore.Modules.Data 命名空间） -->
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\Data\CJCore.Modules.Data.Api\CJCore.Modules.Data.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,5 @@
-@using System.Diagnostics
 @using CJDSL.Blazor.Models
+@using Microsoft.Extensions.Logging
 @using MudBlazor
 
 <MudStack Class="@GetStringProp("Class")">
@@ -42,7 +42,7 @@
                 break;
 
             case "donut":
-                Debug.WriteLine($"[DslChartRenderer] 渲染 Donut, Series count={_donutSeries.Count}, Labels.Length={_donutLabels.Length}");
+                Logger.LogDebug($"[DslChartRenderer] 渲染 Donut, Series count={_donutSeries.Count}, Labels.Length={_donutLabels.Length}");
                 <div style="width:100%; height:@GetStringProp("Height", "300px"); min-height:200px;">
                     <MudChart T="double"
                               ChartType="ChartType.Donut"
@@ -56,7 +56,7 @@
                 break;
 
             case "pie":
-                Debug.WriteLine($"[DslChartRenderer] 渲染 Pie, Series count={_donutSeries.Count}, Labels.Length={_donutLabels.Length}");
+                Logger.LogDebug($"[DslChartRenderer] 渲染 Pie, Series count={_donutSeries.Count}, Labels.Length={_donutLabels.Length}");
                 <div style="width:100%; height:@GetStringProp("Height", "300px"); min-height:200px;">
                     <MudChart T="double"
                               ChartType="ChartType.Pie"
@@ -107,6 +107,7 @@
 @code {
     [CascadingParameter] public DslRenderContext Context { get; set; } = null!;
     [Parameter] public DslComponent Component { get; set; } = null!;
+    [Inject] private ILogger<DslChartRenderer> Logger { get; set; } = null!;
 
     private List<ChartSeries<double>> _lineSeries = new();
     private List<ChartSeries<double>> _donutSeries = [];
@@ -116,12 +117,12 @@
 
     protected override void OnInitialized()
     {
-        Debug.WriteLine($"[DslChartRenderer] OnInitialized, ChartType={GetStringProp("ChartType")}, Label={Component?.Label}");
+        Logger.LogDebug($"[DslChartRenderer] OnInitialized, ChartType={GetStringProp("ChartType")}, Label={Component?.Label}");
         LoadChartData();
     }
     protected override void OnParametersSet()
     {
-        Debug.WriteLine($"[DslChartRenderer] OnParametersSet, ChartType={GetStringProp("ChartType")}, Label={Component?.Label}");
+        Logger.LogDebug($"[DslChartRenderer] OnParametersSet, ChartType={GetStringProp("ChartType")}, Label={Component?.Label}");
         LoadChartData();
     }
 
@@ -178,10 +179,10 @@
     private void LoadPieData()
     {
         var pieData = GetComponentProp<List<Dictionary<string, object>>>("PieData");
-        Debug.WriteLine($"[DslChartRenderer] LoadPieData, PieData is null? {pieData == null}, Props.HasPieData? {Component.Props?.ContainsKey("PieData")}");
+        Logger.LogDebug($"[DslChartRenderer] LoadPieData, PieData is null? {pieData == null}, Props.HasPieData? {Component.Props?.ContainsKey("PieData")}");
         if (pieData != null)
         {
-            Debug.WriteLine($"[DslChartRenderer] PieData 条目数: {pieData.Count}");
+            Logger.LogDebug($"[DslChartRenderer] PieData 条目数: {pieData.Count}");
             _donutLabels = pieData.Select(d => d.GetValueOrDefault("label")?.ToString() ?? "").ToArray();
             var values = pieData.Select(d => Convert.ToDouble(d.GetValueOrDefault("value") ?? 0)).ToArray();
             _donutSeries = new List<ChartSeries<double>>
@@ -192,8 +193,8 @@
                     Data = values
                 }
             };
-            Debug.WriteLine($"[DslChartRenderer] _donutLabels=[{string.Join(", ", _donutLabels)}], values=[{string.Join(", ", values)}]");
-            Debug.WriteLine($"[DslChartRenderer] ChartSeries 构建完成, Series count={_donutSeries.Count}, Data count={_donutSeries.FirstOrDefault()?.Data.Count ?? 0}");
+            Logger.LogDebug($"[DslChartRenderer] _donutLabels=[{string.Join(", ", _donutLabels)}], values=[{string.Join(", ", values)}]");
+            Logger.LogDebug($"[DslChartRenderer] ChartSeries 构建完成, Series count={_donutSeries.Count}, Data count={_donutSeries.FirstOrDefault()?.Data.Count ?? 0}");
         }
         else
         {

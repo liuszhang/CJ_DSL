@@ -1,3 +1,4 @@
+using CJCore.LLM.Abstractions;
 using CJDSL.Domain;
 using CJDSL.Domain.Entities.Dsl;
 using CJDSL.Domain.Entities.MetaModel;
@@ -8,24 +9,23 @@ using Microsoft.Extensions.Logging;
 namespace CJDSL.Infrastructure.Services;
 
 /// <summary>
-/// 基于 LLM 的 DSL 生成器 - 通过大模型生成 DSL 页面
+/// 基于 LLM 的 DSL 生成器 - 通过大模型生成 DSL 页面。
+/// 模块 J：LLM 调用收敛到 CJCore —— 使用 IStructuredLLMClient 强类型结构化输出
+/// （内置 markdown 围栏剥离 / JSON 注释清洗 / 反序列化），取代自建裸文本解析。
 /// </summary>
 public class LlmDslGenerator : IDslGenerator
 {
-    private readonly ILLMClientProvider _clientProvider;
+    private readonly IStructuredLLMClient _structuredClient;
     private readonly IDslPromptBuilder _promptBuilder;
-    private readonly IDslResponseParser _responseParser;
     private readonly ILogger<LlmDslGenerator> _logger;
 
     public LlmDslGenerator(
-        ILLMClientProvider clientProvider,
+        IStructuredLLMClient structuredClient,
         IDslPromptBuilder promptBuilder,
-        IDslResponseParser responseParser,
         ILogger<LlmDslGenerator> logger)
     {
-        _clientProvider = clientProvider;
+        _structuredClient = structuredClient;
         _promptBuilder = promptBuilder;
-        _responseParser = responseParser;
         _logger = logger;
     }
 
@@ -61,36 +61,32 @@ public class LlmDslGenerator : IDslGenerator
         return await GenerateFromLlmAsync(systemPrompt, userPrompt, ct);
     }
 
-    public Task<DslPage> GenerateDashboardAsync(M4_Scene scene, GenerateOptions options, CancellationToken ct = default)
+    public async Task<DslPage> GenerateDashboardAsync(M4_Scene scene, GenerateOptions options, CancellationToken ct = default)
     {
-        // Dashboard generation - simplified
-        var dsl = new DslPage
+        try
         {
-            Id = $"dashboard_{scene?.Code ?? "default"}",
-            Title = scene?.Name ?? "仪表盘",
-            Description = scene?.Description ?? "",
-            Layout = "dashboard",
-            Components = new List<DslComponent>
+            var systemPrompt = _promptBuilder.BuildSystemPrompt();
+            var userPrompt = _promptBuilder.BuildDashboardPrompt(scene, options);
+
+            var result = await _structuredClient.SendStructuredAsync<DslPage>(
+                systemPrompt, userPrompt, temperature: 0.3, maxTokens: 4096, ct: ct);
+
+            if (!result.IsSuccess || result.Data == null)
             {
-                new()
-                {
-                    Type = "grid",
-                    Children = new List<DslComponent>
-                    {
-                        new()
-                        {
-                            Type = "card",
-                            Props = new Dictionary<string, object> { { "Elevation", 2 } },
-                            Children = new List<DslComponent>
-                            {
-                                new() { Type = "textDisplay", Props = new Dictionary<string, object> { { "Typo", "h5" } }, Label = "仪表盘" }
-                            }
-                        }
-                    }
-                }
+                _logger.LogWarning("LLM 仪表盘生成失败: {Error}", result.Error);
+                return CreateDashboardFallback(scene);
             }
-        };
-        return Task.FromResult(dsl);
+
+            _logger.LogInformation(
+                "LLM 仪表盘生成成功（PromptTokens={Prompt}, CompletionTokens={Completion}）",
+                result.PromptTokens, result.CompletionTokens);
+            return result.Data;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during LLM dashboard generation");
+            return CreateDashboardFallback(scene);
+        }
     }
 
     public async Task<DslPage> AdaptAsync(DslPage baseDsl, UserContext user, DataContext data, CancellationToken ct = default)
@@ -117,32 +113,19 @@ public class LlmDslGenerator : IDslGenerator
     {
         try
         {
-            var client = _clientProvider.GetClient();
-            _logger.LogInformation("Using LLM provider: {Provider}", client.Provider);
+            var result = await _structuredClient.SendStructuredAsync<DslPage>(
+                systemPrompt, userPrompt, temperature: 0.3, maxTokens: 4096, ct: ct);
 
-            var response = await client.GenerateAsync(new LLMRequest
+            if (!result.IsSuccess || result.Data == null)
             {
-                SystemPrompt = systemPrompt,
-                UserPrompt = userPrompt,
-                Temperature = 0.3f,
-                MaxTokens = 4096,
-                JsonMode = true
-            }, ct);
-
-            if (!response.IsSuccess || string.IsNullOrWhiteSpace(response.RawText))
-            {
-                _logger.LogWarning("LLM generation failed: {Error}", response.ErrorMessage);
+                _logger.LogWarning("LLM 结构化生成失败: {Error}", result.Error);
                 return CreateFallbackPage();
             }
 
-            var dslPage = _responseParser.Parse(response.RawText);
-            if (dslPage == null)
-            {
-                _logger.LogWarning("Failed to parse LLM response as DSL");
-                return CreateFallbackPage();
-            }
-
-            return dslPage;
+            _logger.LogInformation(
+                "LLM DSL 生成成功（PromptTokens={Prompt}, CompletionTokens={Completion}）",
+                result.PromptTokens, result.CompletionTokens);
+            return result.Data;
         }
         catch (Exception ex)
         {
@@ -183,6 +166,77 @@ public class LlmDslGenerator : IDslGenerator
             }
         };
     }
+
+    private static DslPage CreateDashboardFallback(M4_Scene? scene)
+    {
+        var title = scene?.Name ?? "数据仪表盘";
+        var statCards = new List<DslComponent>
+        {
+            BuildStatCard("业务对象", "—", "Primary"),
+            BuildStatCard("枚举项", "—", "Secondary"),
+            BuildStatCard("字典项", "—", "Tertiary"),
+            BuildStatCard("今日待办", "—", "Info")
+        };
+
+        return new DslPage
+        {
+            Id = $"dashboard_{scene?.Code ?? "default"}",
+            Title = title,
+            Description = scene?.Description ?? "基于元模型统计的仪表盘（LLM 生成失败，使用模板回退）",
+            Layout = "dashboard",
+            Components = new List<DslComponent>
+            {
+                new()
+                {
+                    Type = "grid",
+                    Props = new Dictionary<string, object> { { "Spacing", 3 } },
+                    Children = statCards
+                },
+                new()
+                {
+                    Type = "card",
+                    Props = new Dictionary<string, object> { { "Elevation", 2 }, { "Class", "mt-4" } },
+                    Children = new List<DslComponent>
+                    {
+                        new() { Type = "textDisplay", Props = new Dictionary<string, object> { { "Typo", "h6" } }, Label = "趋势图" },
+                        new()
+                        {
+                            Type = "chart",
+                            Props = new Dictionary<string, object> { { "ChartType", "line" }, { "Title", "近 7 日趋势" }, { "Height", "280" } }
+                        }
+                    }
+                },
+                new()
+                {
+                    Type = "card",
+                    Props = new Dictionary<string, object> { { "Elevation", 2 }, { "Class", "mt-4" } },
+                    Children = new List<DslComponent>
+                    {
+                        new() { Type = "textDisplay", Props = new Dictionary<string, object> { { "Typo", "h6" } }, Label = "最近记录" },
+                        new()
+                        {
+                            Type = "list",
+                            Children = new List<DslComponent>
+                            {
+                                new() { Type = "listItem", Label = "暂无数据" }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    private static DslComponent BuildStatCard(string label, string value, string color) => new()
+    {
+        Type = "card",
+        Props = new Dictionary<string, object> { { "Elevation", 2 }, { "Class", "pa-3" } },
+        Children = new List<DslComponent>
+        {
+            new() { Type = "textDisplay", Props = new Dictionary<string, object> { { "Typo", "body2" }, { "Color", color } }, Label = label },
+            new() { Type = "textDisplay", Props = new Dictionary<string, object> { { "Typo", "h3" } }, Label = value }
+        }
+    };
 
     private static DslPage CloneDslPage(DslPage source)
     {

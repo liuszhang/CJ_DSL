@@ -166,7 +166,7 @@ public class DslSecurityValidator : IDslSecurityValidator
     }
 
     /// <summary>
-    /// 创建带超时与最小全局对象的沙箱引擎：阻断死循环，不暴露 System/IO/Net 等危险宿主对象。
+    /// 创建带超时与最小全局对象的沙箱引擎：阻断死循环，不暴露 System/IO/Net/Reflection 等危险宿主对象。
     /// </summary>
     internal static Engine CreateSandboxedEngine()
     {
@@ -174,9 +174,13 @@ public class DslSecurityValidator : IDslSecurityValidator
         {
             opts.TimeoutInterval(TimeSpan.FromSeconds(3)); // 表达式求值超时 3s，阻断 while(true)
             opts.MaxStatements(10_000);                    // 双保险：限制语句数
+            opts.Strict();                                 // 严格模式：禁止隐式全局变量，缩小攻击面
+            opts.LimitRecursion(64);                      // 限制递归深度，防止栈溢出型恶意表达式
         });
 
-        // 注入与运行时一致的只读全局，避免合法表达式（如 user.role）被误判
+        // 安全约束（满足 E2）：Jint 默认不会暴露 CLR 宿主类型，这里也绝不调用 AddExtension / AllowClr，
+        // 因此表达式无法访问 System / IO / Net / Reflection 等任何 .NET 命名空间或类型，
+        // 只能使用下方显式注入的只读全局对象（与运行时语义一致）。
         engine.SetValue("$store", new DslDataContext());
         engine.SetValue("today", DateTime.Today);
         engine.SetValue("now", DateTime.Now);

@@ -1,3 +1,5 @@
+using CJCore.LLM.LLMClient;
+using CJCore.LLM.Structured;
 using CJDSL.Domain.Interfaces;
 using CJDSL.Infrastructure.Caching;
 using CJDSL.Infrastructure.Configuration;
@@ -64,15 +66,17 @@ public static class InfrastructureServiceExtensions
         // 系统配置服务
         services.AddSingleton<SystemConfigService>();
 
-        // LLM 响应解析器
-        services.AddSingleton<IDslResponseParser, DslResponseParser>();
-
         // LLM Prompt 构建器
         services.AddSingleton<IDslPromptBuilder, DslPromptBuilder>();
 
-        // LLM 客户端工厂 - 按需创建，支持多提供商
+        // ★ 模块 J：LLM 客户端栈收敛到 CJCore
+        // - ILLMConfigReader(DB) + ILLMChatService：CJCore 官方注册入口
+        // - ILLMClient → DbConfiguredLLMClient：每次调用前从 DB 读默认模型配置
+        // - IStructuredLLMClient：强类型结构化输出（LlmDslGenerator 消费）
         services.AddHttpClient();
-        services.AddSingleton<ILLMClientProvider, LLMClientProvider>();
+        services.AddLLMChatService();
+        services.AddHttpClient<CJCore.LLM.Abstractions.ILLMClient, LLM.DbConfiguredLLMClient>();
+        services.AddCJCoreStructuredLLM();
 
         // HTTP 客户端
         services.AddHttpClient("DslApi", client =>

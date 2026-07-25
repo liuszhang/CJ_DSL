@@ -7,6 +7,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CJDSL.Application\CJDSL.Application.csproj" />
+    <!-- CJCore 共享 LLM 模块（模块 J：LLM 收敛，客户端栈 + DB 配置读取 + 结构化输出） -->
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.Abstractions\CJCore.LLM.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.LLMClient\CJCore.LLM.LLMClient.csproj" />
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.Structured\CJCore.LLM.Structured.csproj" />
   </ItemGroup>
 
   <ItemGroup>
