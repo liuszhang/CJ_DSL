@@ -1,3 +1,4 @@
+using CJDSL.Blazor.Components;
 using CJDSL.Blazor.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -197,23 +198,50 @@ public class DslEventDispatcher : IDslEventDispatcher
         return Task.FromResult(true);
     }
 
-    // openModal/closeModal/refresh/export 为 Phase 2 范围，当前保持占位提示
-    private Task<bool> HandleOpenModalAsync(DslEvent evt, DslRenderContext context)
+    // openModal/closeModal/refresh/export —— Phase 2 实现
+    private async Task<bool> HandleOpenModalAsync(DslEvent evt, DslRenderContext context)
     {
-        _snackbar.Add("打开模态框（功能开发中）", Severity.Info);
-        return Task.FromResult(true);
+        DslComponent? dialogContent = null;
+        var contentJson = evt.Params?.GetValueOrDefault("content")?.ToString();
+        if (!string.IsNullOrEmpty(contentJson))
+        {
+            try { dialogContent = JsonSerializer.Deserialize<DslComponent>(contentJson); }
+            catch { dialogContent = null; }
+        }
+
+        var parameters = new DialogParameters
+        {
+            { "Content", dialogContent },
+            { "EventDispatcher", context.EventDispatcher }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        var dialog = await _dialogService.ShowAsync<DslDialog>("对话框", parameters, options);
+        var result = await dialog.Result;
+        return !result.Canceled;
     }
 
     private Task<bool> HandleCloseModalAsync(DslEvent evt, DslRenderContext context)
     {
-        _snackbar.Add("关闭模态框（功能开发中）", Severity.Info);
-        return Task.FromResult(true);
+        if (context.DialogInstance != null)
+        {
+            context.DialogInstance.Close();
+            return Task.FromResult(true);
+        }
+
+        _snackbar.Add("当前不在对话框上下文中，无法关闭", Severity.Warning);
+        return Task.FromResult(false);
     }
 
-    private Task<bool> HandleRefreshAsync(DslEvent evt, DslRenderContext context)
+    private async Task<bool> HandleRefreshAsync(DslEvent evt, DslRenderContext context)
     {
-        _snackbar.Add("刷新数据（功能开发中）", Severity.Info);
-        return Task.FromResult(true);
+        if (context.OnRefresh != null)
+            await context.OnRefresh();
+
+        // 写入刷新时间戳，触发依赖该值的表达式重新求值
+        context.DataStore.Set("__refreshTick", DateTime.Now);
+        _snackbar.Add("已刷新", Severity.Success);
+        return true;
     }
 
     private Task<bool> HandleSetValueAsync(DslEvent evt, DslRenderContext context)
@@ -238,10 +266,46 @@ public class DslEventDispatcher : IDslEventDispatcher
         return Task.FromResult(true);
     }
 
-    private Task<bool> HandleExportAsync(DslEvent evt, DslRenderContext context)
+    private async Task<bool> HandleExportAsync(DslEvent evt, DslRenderContext context)
     {
-        _snackbar.Add("导出功能开发中", Severity.Info);
-        return Task.FromResult(true);
+        var formId = evt.Params?.GetValueOrDefault("formId")?.ToString();
+        var fileName = evt.Params?.GetValueOrDefault("fileName")?.ToString() ?? "export.csv";
+
+        List<Dictionary<string, object>> rows;
+        if (!string.IsNullOrEmpty(formId) && context.Forms.TryGetValue(formId, out var form))
+            rows = new List<Dictionary<string, object>> { form.GetValues() };
+        else
+            rows = context.DataStore.GetList<Dictionary<string, object>>("datasource.items") ?? new List<Dictionary<string, object>>();
+
+        if (rows.Count == 0)
+        {
+            _snackbar.Add("没有可导出的数据", Severity.Warning);
+            return false;
+        }
+
+        var csv = BuildCsv(rows);
+        await _jsRuntime.InvokeVoidAsync("CJDSL.downloadFile", fileName, csv);
+        _snackbar.Add($"已导出 {rows.Count} 行到 {fileName}", Severity.Success);
+        return true;
+    }
+
+    private static string BuildCsv(List<Dictionary<string, object>> rows)
+    {
+        if (rows.Count == 0) return string.Empty;
+        var headers = rows.SelectMany(r => r.Keys).Distinct().ToList();
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(string.Join(",", headers.Select(EscapeCsv)));
+        foreach (var row in rows)
+            sb.AppendLine(string.Join(",", headers.Select(h => EscapeCsv(row.TryGetValue(h, out var v) ? v?.ToString() ?? "" : ""))));
+        return sb.ToString();
+    }
+
+    private static string EscapeCsv(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        return value;
     }
 
     /// <summary>

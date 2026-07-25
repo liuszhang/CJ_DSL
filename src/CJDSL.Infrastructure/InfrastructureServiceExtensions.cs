@@ -58,6 +58,8 @@ public static class InfrastructureServiceExtensions
 
         // 验证器
         services.AddSingleton<IDslValidator, DslSemanticValidator>();
+        // 安全校验器（表达式沙箱 / endpoint 白名单 / 富文本清洗）
+        services.AddSingleton<IDslSecurityValidator, DslSecurityValidator>();
 
         // 系统配置服务
         services.AddSingleton<SystemConfigService>();

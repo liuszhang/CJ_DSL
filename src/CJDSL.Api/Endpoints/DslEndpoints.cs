@@ -26,6 +26,7 @@ public static class DslEndpoints
             GenerateDslRequest request,
             [FromQuery] string? provider,
             IMediator mediator,
+            IDslSecurityValidator security,
             CancellationToken ct) =>
         {
             var options = request.Options ?? new GenerateOptions();
@@ -38,9 +39,14 @@ public static class DslEndpoints
                 request.UserContext,
                 options);
             var result = await mediator.Send(command, ct);
-            return result.IsSuccess
-                ? Results.Ok(result.Value)
-                : Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+            if (!result.IsSuccess)
+                return Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+
+            var generated = await security.SanitizeAsync(result.Value, ct);
+            var sec = await security.ValidateAsync(generated, ct);
+            return sec.IsSafe
+                ? Results.Ok(generated)
+                : Results.BadRequest(new { error = "DSL 安全校验未通过", details = sec.Errors, code = "Dsl.Security" });
         });
 
         // 基于自然语言生成 DSL（默认走 LLM，未配置 LLM 时降级模板解析）
@@ -48,6 +54,7 @@ public static class DslEndpoints
             GenerateFromNlpRequest request,
             [FromQuery] string? provider,
             IMediator mediator,
+            IDslSecurityValidator security,
             CancellationToken ct) =>
         {
             var options = request.Options ?? new GenerateOptions();
@@ -59,9 +66,14 @@ public static class DslEndpoints
                 request.UserContext,
                 options);
             var result = await mediator.Send(command, ct);
-            return result.IsSuccess
-                ? Results.Ok(result.Value)
-                : Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+            if (!result.IsSuccess)
+                return Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+
+            var generated = await security.SanitizeAsync(result.Value, ct);
+            var sec = await security.ValidateAsync(generated, ct);
+            return sec.IsSafe
+                ? Results.Ok(generated)
+                : Results.BadRequest(new { error = "DSL 安全校验未通过", details = sec.Errors, code = "Dsl.Security" });
         });
 
         // 基于当前上下文动态调整 DSL（默认走 LLM，未配置 LLM 时降级规则适配）
@@ -69,6 +81,7 @@ public static class DslEndpoints
             AdaptDslRequest request,
             [FromQuery] string? provider,
             IMediator mediator,
+            IDslSecurityValidator security,
             CancellationToken ct) =>
         {
             var command = new AdaptDslCommand(
@@ -77,9 +90,14 @@ public static class DslEndpoints
                 request.DataContext,
                 provider);
             var result = await mediator.Send(command, ct);
-            return result.IsSuccess
-                ? Results.Ok(result.Value)
-                : Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+            if (!result.IsSuccess)
+                return Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+
+            var generated = await security.SanitizeAsync(result.Value, ct);
+            var sec = await security.ValidateAsync(generated, ct);
+            return sec.IsSafe
+                ? Results.Ok(generated)
+                : Results.BadRequest(new { error = "DSL 安全校验未通过", details = sec.Errors, code = "Dsl.Security" });
         });
 
         // 获取页面 DSL
@@ -98,12 +116,16 @@ public static class DslEndpoints
                 : Results.NotFound(new { error = result.Error, code = result.ErrorCode });
         });
 
-        // 验证 DSL 语法
+        // 验证 DSL 语法 + 安全
         group.MapPost("/validate", async (
             DslPage dsl,
-            IDslValidator validator) =>
+            IDslValidator validator,
+            IDslSecurityValidator security) =>
         {
             var result = await validator.ValidateAsync(dsl);
+            var sec = await security.ValidateAsync(dsl);
+            result.Errors.AddRange(sec.Errors);
+            result.Warnings.AddRange(sec.Warnings);
             return Results.Ok(result);
         });
 

@@ -1,0 +1,41 @@
+@using CJDSL.Blazor.Expressions
+@using CJDSL.Blazor.Models
+@using CJDSL.Blazor.Components.Renderers
+
+<MudDialog>
+    <DialogContent>
+        @if (Content != null)
+        {
+            <CascadingValue Value="_context">
+                <DslComponentRenderer Component="Content" />
+            </CascadingValue>
+        }
+        else
+        {
+            <MudText>无对话框内容</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance DialogInstance { get; set; } = null!;
+
+    [Parameter] public DslComponent? Content { get; set; }
+    [Parameter] public IDslEventDispatcher? EventDispatcher { get; set; }
+
+    private readonly DslRenderContext _context = new();
+
+    protected override void OnInitialized()
+    {
+        // 对话框使用独立的渲染上下文：自带表达式求值器，并继承页面级派发器与对话框实例
+        _context.ExpressionEvaluator = new ClientJintEvaluator();
+        _context.EventDispatcher = EventDispatcher;
+        _context.DialogInstance = DialogInstance;
+        _context.User = new UserContext();
+    }
+
+    private void Close() => DialogInstance.Close();
+}

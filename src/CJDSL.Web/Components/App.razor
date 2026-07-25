@@ -24,5 +24,20 @@
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_content/CJDSL.Blazor/js/cjdsl-richtext.js"></script>
+    <script>
+        // export Handler 通过 IJSRuntime 调用，触发浏览器下载 CSV
+        window.CJDSL = window.CJDSL || {};
+        window.CJDSL.downloadFile = function (name, content) {
+            var blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+    </script>
 </body>
 </html>

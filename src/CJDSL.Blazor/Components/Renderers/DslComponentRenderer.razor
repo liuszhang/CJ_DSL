@@ -1,4 +1,5 @@
 @using System.Text.RegularExpressions
+@using System.Text.Json
 @using CJDSL.Blazor.Models
 @using Microsoft.JSInterop
 @using MudBlazor
@@ -316,6 +317,19 @@
                 <DslChartRenderer Component="Component" />
                 break;
 
+            case "dialog":
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenThisDialog">打开：@(Component.Label ?? "对话框")</MudButton>
+                break;
+
+            case "snackbar":
+                <MudText Typo="Typo.body2" Class="@GetStringProp("Class")">@(GetStringProp("Message") ?? Component.Label ?? "")</MudText>
+                break;
+
+            case "markdown":
+                var mdContent = GetStringProp("Content") ?? Component.Label ?? "";
+                <MudMarkdown Value="@mdContent" />
+                break;
+
             default:
                 <MudAlert Severity="Severity.Warning">
                     未识别的组件类型: @Component.Type
@@ -580,6 +594,25 @@
             var ok = await Context.EventDispatcher.DispatchAsync(evt, Component, Context);
             if (!ok) break; // 事件链被中断（如用户取消确认）
         }
+    }
+
+    private Task OpenThisDialog(MouseEventArgs e)
+    {
+        if (Context.EventDispatcher == null)
+        {
+            Snackbar.Add("事件派发器未初始化", Severity.Warning);
+            return Task.CompletedTask;
+        }
+
+        // 将当前 dialog 组件序列化后传给 openModal，由 DslDialog 渲染其 Children
+        var content = JsonSerializer.Serialize(Component);
+        var evt = new DslEvent
+        {
+            Type = "onClick",
+            Handler = CJDSL.Domain.Entities.Dsl.DslHandlers.OpenModal,
+            Params = new Dictionary<string, object> { { "content", content } }
+        };
+        return Context.EventDispatcher.DispatchAsync(evt, Component, Context);
     }
 
     private void HandlePageChange(int page)

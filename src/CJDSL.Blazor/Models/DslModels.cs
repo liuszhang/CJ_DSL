@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using MudBlazor;
 
 namespace CJDSL.Blazor.Models;
 
@@ -40,6 +41,17 @@ public class DslRenderContext
 
     /// <summary>页面级事件派发器（由 DslPageRenderer 创建并注入）</summary>
     public IDslEventDispatcher? EventDispatcher { get; set; }
+
+    /// <summary>
+    /// 当前所处的 MudDialog 实例（仅当该上下文位于对话框内时非空）。
+    /// closeModal Handler 通过它关闭对话框。
+    /// </summary>
+    public IMudDialogInstance? DialogInstance { get; set; }
+
+    /// <summary>
+    /// 数据刷新回调（refresh Handler 触发）。由 DslPageRenderer 注入为 StateHasChanged + 重新加载数据源。
+    /// </summary>
+    public Func<Task>? OnRefresh { get; set; }
 
     /// <summary>
     /// 注册表单：以 form 组件的 Id 为 formId，登记其后代中声明了 FieldName 的字段，

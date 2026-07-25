@@ -1,9 +1,0 @@
-Program.cs
-Services\CJDSLMenuService.cs
-Services\CJDSLModule.cs
-Services\FloatService.cs
-obj\Debug\net10.0\EmbeddedAttribute.cs
-obj\Debug\net10.0\ValidatableTypeAttribute.cs
-obj\Debug\net10.0\CJDSL.Web.GlobalUsings.g.cs
-obj\Debug\net10.0\.NETCoreApp,Version=v10.0.AssemblyAttributes.cs
-obj\Debug\net10.0\CJDSL.Web.AssemblyInfo.cs

@@ -17,6 +17,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
     <PackageReference Include="MudBlazor" />
+    <PackageReference Include="MudBlazor.Markdown" />
     <PackageReference Include="Jint" />
   </ItemGroup>
 

@@ -5,6 +5,7 @@ using CJDSL.Infrastructure;
 using CJDSL.Web.Components;
 using CJDSL.Web.Services;
 using Microsoft.AspNetCore.Components;
+using MudBlazor;
 using MudBlazor.Services;
 using CJCore.Framework.Api;
 using CJCore.Framework.Abstractions;
@@ -22,6 +23,7 @@ public class Program
             .AddInteractiveServerComponents();
 
         builder.Services.AddMudServices();
+        builder.Services.AddMudMarkdownServices(); // MudBlazor.Markdown（markdown 组件渲染）
 
         builder.Services.AddHttpClient();
         builder.Services.AddScoped<HttpClient>(sp =>

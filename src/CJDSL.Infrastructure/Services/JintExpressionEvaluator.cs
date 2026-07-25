@@ -10,15 +10,13 @@ namespace CJDSL.Infrastructure.Services;
 /// </summary>
 public class JintExpressionEvaluator : IExpressionEvaluator
 {
-    private readonly Engine _engine = new();
-
     public T Evaluate<T>(string expression, IDataContext dataContext)
     {
         if (string.IsNullOrWhiteSpace(expression))
             return default!;
 
-        // 构建 JavaScript 执行上下文
-        var engine = new Engine();
+        // 构建 JavaScript 执行上下文（沙箱：超时 3s，不暴露危险宿主对象）
+        var engine = DslSecurityValidator.CreateSandboxedEngine();
 
         // 注入数据到 $ctx 变量
         engine.SetValue("$ctx", dataContext);
@@ -54,7 +52,7 @@ public class JintExpressionEvaluator : IExpressionEvaluator
     {
         try
         {
-            new Engine().Evaluate(expression);
+            DslSecurityValidator.CreateSandboxedEngine().Evaluate(expression);
             return true;
         }
         catch

@@ -1,9 +1,0 @@
-Dsl\Commands\AdaptDslCommand.cs
-Dsl\Commands\GenerateDslCommand.cs
-Dsl\Commands\GenerateDslFromNlpCommand.cs
-Dsl\DslDto.cs
-Dsl\Queries\GetDslQuery.cs
-Mapping\DslMappingProfile.cs
-obj\Debug\net10.0\CJDSL.Application.GlobalUsings.g.cs
-obj\Debug\net10.0\.NETCoreApp,Version=v10.0.AssemblyAttributes.cs
-obj\Debug\net10.0\CJDSL.Application.AssemblyInfo.cs
