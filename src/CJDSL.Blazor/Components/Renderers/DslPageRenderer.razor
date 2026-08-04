@@ -73,6 +73,9 @@ else
 
                 _dispatcher = new DslEventDispatcher(
                     HttpClient, Snackbar, Navigation, DialogService, JSRuntime);
+                _context.EventDispatcher = _dispatcher;
+                // refresh Handler 触发整页重渲染（数据源重新加载由具体业务组件实现）
+                _context.OnRefresh = () => InvokeAsync(StateHasChanged);
 
                 if (InitialData != null)
                 {

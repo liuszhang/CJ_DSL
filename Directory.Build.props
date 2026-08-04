@@ -1,0 +1,11 @@
+<Project>
+  <!-- 共享构建属性：集中放置于 Directory.Build.props（而非 Directory.Packages.props）。
+       Directory.Packages.props 仅保留中央包管理(CPM)的版本定义。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

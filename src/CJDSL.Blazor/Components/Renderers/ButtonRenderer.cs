@@ -22,6 +22,14 @@ public class ButtonRenderer : IDslComponentRenderer
         builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(b => b.AddContent(0, component.Label ?? "Button")));
         builder.AddAttribute(sequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, async _ =>
         {
+            var action = GetComponentStringProp(component, "action");
+            if (!string.IsNullOrEmpty(action))
+            {
+                var handler = context.OnAction ?? DslRenderContext.GlobalActionHandler;
+                if (handler != null)
+                    await handler.Invoke(action);
+            }
+
             if (component.Events == null) return;
             foreach (var evt in component.Events.Where(e => e.Type == "onClick"))
             {

@@ -1,8 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace CJDSL.Domain;
 
 /// <summary>
 /// 目标渲染平台
 /// </summary>
+[JsonConverter(typeof(DomainTargetPlatformConverter))]
 public enum TargetPlatform
 {
     Web,
@@ -10,6 +13,13 @@ public enum TargetPlatform
     Maui,
     React,
     Vue
+}
+
+/// <summary>
+/// TargetPlatform 的 JSON 转换器（字符串/数字均可，未知值回退 Web）。
+/// </summary>
+public sealed class DomainTargetPlatformConverter : FlexibleEnumConverter<TargetPlatform>
+{
 }
 
 /// <summary>
@@ -24,6 +34,12 @@ public class GenerateOptions
     public TargetPlatform TargetPlatform { get; set; } = TargetPlatform.Web;
     public Dictionary<string, object>? DataContext { get; set; }
     public float Temperature { get; set; } = 0.3f;
+
+    /// <summary>
+    /// 生成器提供方："template"（模板）| "llm"（大模型）。
+    /// 为空时由各链路使用自身默认值（元模型生成默认 template，NLP/Adapt 默认 llm）。
+    /// </summary>
+    public string? Provider { get; set; }
 }
 
 public class UserPreference

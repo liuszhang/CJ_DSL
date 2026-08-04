@@ -209,15 +209,77 @@ public class TemplateDslGenerator : IDslGenerator
 
     public Task<DslPage> GenerateDashboardAsync(M4_Scene scene, GenerateOptions options, CancellationToken ct = default)
     {
+        var title = scene?.Name ?? "数据仪表盘";
+
+        // 统计卡片（模板生成器不依赖运行时数据，展示结构占位；具体数值由前端绑定数据源填充）
+        var statCards = new List<DslComponent>
+        {
+            BuildStatCard("业务对象", "—", "Primary"),
+            BuildStatCard("枚举项", "—", "Secondary"),
+            BuildStatCard("字典项", "—", "Tertiary"),
+            BuildStatCard("今日待办", "—", "Info")
+        };
+
         var dsl = new DslPage
         {
-            Id = "dashboard",
-            Title = "仪表盘",
+            Id = $"dashboard_{scene?.Code ?? "default"}",
+            Title = title,
+            Description = scene?.Description ?? "基于元模型统计的仪表盘",
             Layout = "dashboard",
-            Components = new List<DslComponent>()
+            Components = new List<DslComponent>
+            {
+                new()
+                {
+                    Type = "grid",
+                    Props = new Dictionary<string, object> { { "Spacing", 3 } },
+                    Children = statCards
+                },
+                new()
+                {
+                    Type = "card",
+                    Props = new Dictionary<string, object> { { "Elevation", 2 }, { "Class", "mt-4" } },
+                    Children = new List<DslComponent>
+                    {
+                        new() { Type = "textDisplay", Props = new Dictionary<string, object> { { "Typo", "h6" } }, Label = "趋势图" },
+                        new()
+                        {
+                            Type = "chart",
+                            Props = new Dictionary<string, object> { { "ChartType", "line" }, { "Title", "近 7 日趋势" }, { "Height", "280" } }
+                        }
+                    }
+                },
+                new()
+                {
+                    Type = "card",
+                    Props = new Dictionary<string, object> { { "Elevation", 2 }, { "Class", "mt-4" } },
+                    Children = new List<DslComponent>
+                    {
+                        new() { Type = "textDisplay", Props = new Dictionary<string, object> { { "Typo", "h6" } }, Label = "最近记录" },
+                        new()
+                        {
+                            Type = "list",
+                            Children = new List<DslComponent>
+                            {
+                                new() { Type = "listItem", Label = "暂无数据" }
+                            }
+                        }
+                    }
+                }
+            }
         };
         return Task.FromResult(dsl);
     }
+
+    private static DslComponent BuildStatCard(string label, string value, string color) => new()
+    {
+        Type = "card",
+        Props = new Dictionary<string, object> { { "Elevation", 2 }, { "Class", "pa-3" } },
+        Children = new List<DslComponent>
+        {
+            new() { Type = "textDisplay", Props = new Dictionary<string, object> { { "Typo", "body2" }, { "Color", color } }, Label = label },
+            new() { Type = "textDisplay", Props = new Dictionary<string, object> { { "Typo", "h3" } }, Label = value }
+        }
+    };
 
     public Task<DslPage> AdaptAsync(DslPage baseDsl, UserContext user, DataContext data, CancellationToken ct = default)
     {

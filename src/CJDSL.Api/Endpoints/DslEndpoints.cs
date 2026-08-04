@@ -21,42 +21,83 @@ public static class DslEndpoints
             .WithTags("DSL")
             .WithOpenApi();
 
-        // 基于元模型生成 DSL
+        // 基于元模型生成 DSL（?provider=llm|template，默认 template）
         group.MapPost("/generate", async (
             GenerateDslRequest request,
+            [FromQuery] string? provider,
             IMediator mediator,
+            IDslSecurityValidator security,
             CancellationToken ct) =>
         {
+            var options = request.Options ?? new GenerateOptions();
+            if (!string.IsNullOrWhiteSpace(provider))
+                options.Provider = provider;
+
             var command = new GenerateDslCommand(
                 request.MetaObjectCode,
                 request.Layout,
                 request.UserContext,
-                request.Options);
+                options);
             var result = await mediator.Send(command, ct);
-            return result.IsSuccess
-                ? Results.Ok(result.Value)
-                : Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+            if (!result.IsSuccess)
+                return Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+
+            var generated = await security.SanitizeAsync(result.Value, ct);
+            var sec = await security.ValidateAsync(generated, ct);
+            return sec.IsSafe
+                ? Results.Ok(generated)
+                : Results.BadRequest(new { error = "DSL 安全校验未通过", details = sec.Errors, code = "Dsl.Security" });
         });
 
-        // 基于自然语言生成 DSL
+        // 基于自然语言生成 DSL（默认走 LLM，未配置 LLM 时降级模板解析）
         group.MapPost("/generate-from-nlp", async (
             GenerateFromNlpRequest request,
+            [FromQuery] string? provider,
             IMediator mediator,
+            IDslSecurityValidator security,
             CancellationToken ct) =>
         {
-            var result = Result.Success<DslPage>(new DslPage { Title = "NLP 生成页面", Layout = "form" });
-            return result.IsSuccess
-                ? Results.Ok(result.Value)
-                : Results.BadRequest(new { error = result.Error });
+            var options = request.Options ?? new GenerateOptions();
+            if (!string.IsNullOrWhiteSpace(provider))
+                options.Provider = provider;
+
+            var command = new GenerateDslFromNlpCommand(
+                request.Description,
+                request.UserContext,
+                options);
+            var result = await mediator.Send(command, ct);
+            if (!result.IsSuccess)
+                return Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+
+            var generated = await security.SanitizeAsync(result.Value, ct);
+            var sec = await security.ValidateAsync(generated, ct);
+            return sec.IsSafe
+                ? Results.Ok(generated)
+                : Results.BadRequest(new { error = "DSL 安全校验未通过", details = sec.Errors, code = "Dsl.Security" });
         });
 
-        // 基于当前上下文动态调整 DSL
+        // 基于当前上下文动态调整 DSL（默认走 LLM，未配置 LLM 时降级规则适配）
         group.MapPost("/adapt", async (
             AdaptDslRequest request,
+            [FromQuery] string? provider,
             IMediator mediator,
+            IDslSecurityValidator security,
             CancellationToken ct) =>
         {
-            return Results.Ok(request.BaseDsl);
+            var command = new AdaptDslCommand(
+                request.BaseDsl,
+                request.UserContext,
+                request.DataContext,
+                provider);
+            var result = await mediator.Send(command, ct);
+            if (!result.IsSuccess)
+                return Results.BadRequest(new { error = result.Error, code = result.ErrorCode });
+
+            var generated = await security.SanitizeAsync(result.Value, ct);
+            var sec = await security.ValidateAsync(generated, ct);
+            return sec.IsSafe
+                ? Results.Ok(generated)
+                : Results.BadRequest(new { error = "DSL 安全校验未通过", details = sec.Errors, code = "Dsl.Security" });
         });
 
         // 获取页面 DSL
@@ -75,12 +116,16 @@ public static class DslEndpoints
                 : Results.NotFound(new { error = result.Error, code = result.ErrorCode });
         });
 
-        // 验证 DSL 语法
+        // 验证 DSL 语法 + 安全
         group.MapPost("/validate", async (
             DslPage dsl,
-            IDslValidator validator) =>
+            IDslValidator validator,
+            IDslSecurityValidator security) =>
         {
             var result = await validator.ValidateAsync(dsl);
+            var sec = await security.ValidateAsync(dsl);
+            result.Errors.AddRange(sec.Errors);
+            result.Warnings.AddRange(sec.Warnings);
             return Results.Ok(result);
         });
 

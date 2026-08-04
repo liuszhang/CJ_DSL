@@ -26,8 +26,11 @@
         支持占位符：{对象名称}、{对象编码}、{属性列表}、{状态列表}、{角色}、{设备}、{密度}、{描述}
     </MudAlert>
 
-    <MudTabs>
-        <MudTabPanel Text="系统提示词" Icon="@Icons.Material.Filled.SmartToy">
+    <MudStack Spacing="4">
+        <div>
+            <MudText Typo="Typo.h6" Class="mb-1">
+                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Class="mr-1" />系统提示词
+            </MudText>
             <MudText Typo="Typo.body2" Class="mb-2 mud-text-secondary">
                 定义 LLM 角色和 CJDSL Schema 规范，所有生成请求都会携带此提示词。
             </MudText>
@@ -35,9 +38,14 @@
                           Variant="Variant.Outlined"
                           Lines="20"
                           Class="font-monospace" />
-        </MudTabPanel>
+        </div>
 
-        <MudTabPanel Text="表单生成" Icon="@Icons.Material.Filled.EditNote">
+        <MudDivider />
+
+        <div>
+            <MudText Typo="Typo.h6" Class="mb-1">
+                <MudIcon Icon="@Icons.Material.Filled.EditNote" Class="mr-1" />表单生成
+            </MudText>
             <MudText Typo="Typo.body2" Class="mb-2 mud-text-secondary">
                 从元模型生成表单 DSL 时使用的提示词模板。
             </MudText>
@@ -45,9 +53,14 @@
                           Variant="Variant.Outlined"
                           Lines="20"
                           Class="font-monospace" />
-        </MudTabPanel>
+        </div>
 
-        <MudTabPanel Text="列表生成" Icon="@Icons.Material.Filled.TableChart">
+        <MudDivider />
+
+        <div>
+            <MudText Typo="Typo.h6" Class="mb-1">
+                <MudIcon Icon="@Icons.Material.Filled.TableChart" Class="mr-1" />列表生成
+            </MudText>
             <MudText Typo="Typo.body2" Class="mb-2 mud-text-secondary">
                 从元模型生成列表 DSL 时使用的提示词模板。
             </MudText>
@@ -55,9 +68,14 @@
                           Variant="Variant.Outlined"
                           Lines="20"
                           Class="font-monospace" />
-        </MudTabPanel>
+        </div>
 
-        <MudTabPanel Text="自然语言生成" Icon="@Icons.Material.Filled.Chat">
+        <MudDivider />
+
+        <div>
+            <MudText Typo="Typo.h6" Class="mb-1">
+                <MudIcon Icon="@Icons.Material.Filled.Chat" Class="mr-1" />自然语言生成
+            </MudText>
             <MudText Typo="Typo.body2" Class="mb-2 mud-text-secondary">
                 从自然语言描述生成 DSL 时使用的提示词模板。
             </MudText>
@@ -65,8 +83,8 @@
                           Variant="Variant.Outlined"
                           Lines="20"
                           Class="font-monospace" />
-        </MudTabPanel>
-    </MudTabs>
+        </div>
+    </MudStack>
 
     <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2" Class="mt-4">
         <MudButton Variant="Variant.Outlined" OnClick="@RestoreDefaults"

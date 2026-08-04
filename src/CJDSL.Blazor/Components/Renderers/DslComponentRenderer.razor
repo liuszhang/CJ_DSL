@@ -1,4 +1,5 @@
 @using System.Text.RegularExpressions
+@using System.Text.Json
 @using CJDSL.Blazor.Models
 @using Microsoft.JSInterop
 @using MudBlazor
@@ -12,7 +13,9 @@
 
 @if (CheckVisibility())
 {
-    @if (_matchedRenderer != null)
+    @try
+    {
+        @if (_matchedRenderer != null)
     {
         @_matchedRenderer.Render(Component, Context)
     }
@@ -21,7 +24,7 @@
         @switch (Component.Type)
         {
             case "form":
-                <MudForm @ref="_formRef" @bind-IsValid="_isValid">
+                <MudForm @ref="FormRef" @bind-IsValid="_isValid">
                     @RenderChildren()
                 </MudForm>
                 break;
@@ -35,6 +38,7 @@
             case "number":
                 <MudNumericField T="decimal"
                                @bind-Value="_decimalValue"
+                               @bind-Value:after="OnDecimalChanged"
                                Label="@Component.Label"
                                Required="@GetBoolProp("Required")"
                                Variant="@GetVariant()"
@@ -45,6 +49,7 @@
             case "autocomplete":
                 <MudAutocomplete T="string"
                                  @bind-Value="_stringValue"
+                                 @bind-Value:after="OnStringChanged"
                                  Label="@Component.Label"
                                  Required="@GetBoolProp("Required")"
                                  Variant="@GetVariant()"
@@ -56,6 +61,7 @@
             case "textarea":
                 <MudTextField T="string"
                               @bind-Value="_stringValue"
+                              @bind-Value:after="OnStringChanged"
                               Label="@Component.Label"
                               Required="@GetBoolProp("Required")"
                               Lines="@GetIntProp("Lines", 3)"
@@ -67,6 +73,7 @@
 
             case "date":
                 <MudDatePicker @bind-Date="_dateValue"
+                               @bind-Date:after="OnDateChanged"
                                Label="@Component.Label"
                                Required="@GetBoolProp("Required")"
                                Disabled="@IsDisabled()"
@@ -75,15 +82,21 @@
 
             case "datetime":
                 <MudDatePicker @bind-Date="_dateValue"
+                               @bind-Date:after="OnDateTimeChanged"
                                Label="@Component.Label"
                                Required="@GetBoolProp("Required")"
                                Disabled="@IsDisabled()"
-                               ShowToolbar="false"
+                               Class="@GetStringProp("Class")" />
+                <MudTimePicker @bind-Time="_timeValue"
+                               @bind-Time:after="OnDateTimeChanged"
+                               Label="@(Component.Label + " 时间")"
+                               Disabled="@IsDisabled()"
                                Class="@GetStringProp("Class")" />
                 break;
 
             case "time":
                 <MudTimePicker @bind-Time="_timeValue"
+                               @bind-Time:after="OnTimeChanged"
                                Label="@Component.Label"
                                Required="@GetBoolProp("Required")"
                                Disabled="@IsDisabled()"
@@ -93,6 +106,7 @@
             case "switch":
                 <MudSwitch T="bool"
                            @bind-Value="_boolValue"
+                           @bind-Value:after="OnBoolChanged"
                            Label="@Component.Label"
                            Disabled="@IsDisabled()"
                            Color="Color.Primary"
@@ -102,6 +116,7 @@
             case "checkbox":
                 <MudCheckBox T="bool"
                              @bind-Value="_boolValue"
+                             @bind-Value:after="OnBoolChanged"
                              Label="@Component.Label"
                              Disabled="@IsDisabled()"
                              Color="Color.Primary"
@@ -110,7 +125,7 @@
 
             case "radio":
                 <MudField Label="@Component.Label" Disabled="@IsDisabled()">
-                    <MudRadioGroup T="string" @bind-SelectedOption="_stringValue">
+                    <MudRadioGroup T="string" @bind-SelectedOption="_stringValue" @bind-SelectedOption:after="OnStringChanged">
                         @foreach (var item in GetSelectItems())
                         {
                             <MudRadio T="string" Option="@item.Value">@item.Label</MudRadio>
@@ -122,6 +137,7 @@
             case "slider":
                 <MudSlider T="decimal"
                             @bind-Value="_decimalValue"
+                            @bind-Value:after="OnDecimalChanged"
                             Min="@(GetDecimalProp("Min", 0) ?? 0)"
                             Max="@(GetDecimalProp("Max", 100) ?? 100)"
                             Disabled="@IsDisabled()"
@@ -131,6 +147,7 @@
 
             case "rating":
                 <MudRating @bind-SelectedValue="_intValue"
+                           @bind-SelectedValue:after="OnIntChanged"
                            MaxValue="@GetIntProp("Max", 5)"
                            Disabled="@IsDisabled()"
                            Class="@GetStringProp("Class")" />
@@ -300,12 +317,32 @@
                 <DslChartRenderer Component="Component" />
                 break;
 
+            case "dialog":
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenThisDialog">打开：@(Component.Label ?? "对话框")</MudButton>
+                break;
+
+            case "snackbar":
+                <MudText Typo="Typo.body2" Class="@GetStringProp("Class")">@(GetStringProp("Message") ?? Component.Label ?? "")</MudText>
+                break;
+
+            case "markdown":
+                var mdContent = GetStringProp("Content") ?? Component.Label ?? "";
+                <MudMarkdown Value="@mdContent" />
+                break;
+
             default:
                 <MudAlert Severity="Severity.Warning">
                     未识别的组件类型: @Component.Type
                 </MudAlert>
                 break;
         }
+    }
+    }
+    catch (Exception ex)
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-2 mb-2">
+            组件渲染失败 [@Component.Type]: @ex.Message
+        </MudAlert>
     }
 }
 
@@ -314,7 +351,7 @@
     [Parameter] public DslComponent Component { get; set; } = null!;
 
     private IDslComponentRenderer? _matchedRenderer;
-    private MudForm? _formRef;
+    private MudForm? FormRef;
     private string _stringValue = string.Empty;
     private decimal _decimalValue;
     private DateTime? _dateValue;
@@ -334,6 +371,72 @@
         {
             _matchedRenderer = null;
         }
+
+        // 表单渲染时登记字段，使后代输入组件的变更能回写到对应的 FormState
+        if (Component.Type == "form" && !string.IsNullOrEmpty(Component.Id))
+        {
+            Context.RegisterForm(Component);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        // 一次性从 FormState / DataStore 读取初始值（支持编辑态回填），避免父组件重渲染覆盖用户输入
+        if (string.IsNullOrEmpty(Component.FieldName)) return;
+
+        var initial = Context.GetFieldValue(Component.FieldName);
+        if (initial == null) return;
+
+        switch (Component.Type)
+        {
+            case "text":
+            case "textarea":
+            case "autocomplete":
+            case "radio":
+                _stringValue = initial.ToString() ?? string.Empty;
+                break;
+            case "number":
+            case "slider":
+                _decimalValue = initial switch
+                {
+                    decimal d => d,
+                    int i => i,
+                    _ => 0m
+                };
+                break;
+            case "date":
+                _dateValue = initial as DateTime?;
+                break;
+            case "datetime":
+                if (initial is DateTime dt)
+                {
+                    _dateValue = dt.Date;
+                    _timeValue = dt.TimeOfDay;
+                }
+                break;
+            case "time":
+                _timeValue = initial as TimeSpan?;
+                break;
+            case "switch":
+            case "checkbox":
+                _boolValue = initial is bool b && b;
+                break;
+            case "rating":
+                _intValue = initial is int ri ? ri : 0;
+                break;
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // MudForm 实例在渲染后才可用，渲染完成后把引用登记到 ComponentRefs，
+        // 供 submit/validate/reset 等 Handler 通过 formId 取用
+        if (Component.Type == "form" && !string.IsNullOrEmpty(Component.Id) && FormRef != null)
+        {
+            Context.ComponentRefs[Component.Id] = FormRef;
+        }
     }
 
     private bool CheckVisibility()
@@ -351,10 +454,11 @@
     private RenderFragment RenderChildren() => builder =>
     {
         if (Component.Children == null) return;
+        var childSeq = 0;
         foreach (var child in Component.Children)
         {
-            builder.OpenComponent(0, typeof(DslComponentRenderer));
-            builder.AddAttribute(1, "Component", child);
+            builder.OpenComponent(childSeq++, typeof(DslComponentRenderer));
+            builder.AddAttribute(childSeq++, "Component", child);
             builder.CloseComponent();
         }
     };
@@ -430,17 +534,85 @@
         return row.GetValueOrDefault(dataIndex)?.ToString() ?? "";
     }
 
+    private void OnStringChanged()
+    {
+        if (!string.IsNullOrEmpty(Component.FieldName))
+            Context.SetFieldValue(Component.FieldName, _stringValue);
+    }
+
+    private void OnDecimalChanged()
+    {
+        if (!string.IsNullOrEmpty(Component.FieldName))
+            Context.SetFieldValue(Component.FieldName, _decimalValue);
+    }
+
+    private void OnDateChanged()
+    {
+        if (!string.IsNullOrEmpty(Component.FieldName))
+            Context.SetFieldValue(Component.FieldName, _dateValue);
+    }
+
+    private void OnTimeChanged()
+    {
+        if (!string.IsNullOrEmpty(Component.FieldName))
+            Context.SetFieldValue(Component.FieldName, _timeValue);
+    }
+
+    private void OnBoolChanged()
+    {
+        if (!string.IsNullOrEmpty(Component.FieldName))
+            Context.SetFieldValue(Component.FieldName, _boolValue);
+    }
+
+    private void OnIntChanged()
+    {
+        if (!string.IsNullOrEmpty(Component.FieldName))
+            Context.SetFieldValue(Component.FieldName, _intValue);
+    }
+
+    private void OnDateTimeChanged()
+    {
+        if (string.IsNullOrEmpty(Component.FieldName)) return;
+        if (_dateValue.HasValue)
+            Context.SetFieldValue(Component.FieldName, _dateValue.Value.Date.Add(_timeValue ?? TimeSpan.Zero));
+        else
+            Context.SetFieldValue(Component.FieldName, null);
+    }
+
     private async Task HandleClick(MouseEventArgs e)
     {
         if (Component.Events == null) return;
 
-        var dispatcher = new CJDSL.Blazor.Events.DslEventDispatcher(
-            HttpClient, Snackbar, Navigation, DialogService, JSRuntime);
+        if (Context.EventDispatcher == null)
+        {
+            Snackbar.Add("事件派发器未初始化", Severity.Warning);
+            return;
+        }
 
         foreach (var evt in Component.Events.Where(ev => ev.Type == "onClick"))
         {
-            await dispatcher.DispatchAsync(evt, Component, Context);
+            var ok = await Context.EventDispatcher.DispatchAsync(evt, Component, Context);
+            if (!ok) break; // 事件链被中断（如用户取消确认）
         }
+    }
+
+    private Task OpenThisDialog(MouseEventArgs e)
+    {
+        if (Context.EventDispatcher == null)
+        {
+            Snackbar.Add("事件派发器未初始化", Severity.Warning);
+            return Task.CompletedTask;
+        }
+
+        // 将当前 dialog 组件序列化后传给 openModal，由 DslDialog 渲染其 Children
+        var content = JsonSerializer.Serialize(Component);
+        var evt = new DslEvent
+        {
+            Type = "onClick",
+            Handler = CJDSL.Domain.Entities.Dsl.DslHandlers.OpenModal,
+            Params = new Dictionary<string, object> { { "content", content } }
+        };
+        return Context.EventDispatcher.DispatchAsync(evt, Component, Context);
     }
 
     private void HandlePageChange(int page)

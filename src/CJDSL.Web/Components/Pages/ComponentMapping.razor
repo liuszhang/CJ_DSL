@@ -8,23 +8,38 @@
     DSL 组件类型与 MudBlazor 前端组件的对应关系，及各类型支持的属性配置
 </MudText>
 
-<MudTabs>
-    <MudTabPanel Text="全部" Icon="@Icons.Material.Filled.ViewList">
+<MudStack Spacing="4">
+    <div>
+        <MudText Typo="Typo.h6" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.ViewList" Class="mr-1" />全部
+        </MudText>
         <ComponentMappingTable Components="_allComponents" />
-    </MudTabPanel>
-    <MudTabPanel Text="表单组件" Icon="@Icons.Material.Filled.EditNote">
+    </div>
+    <div>
+        <MudText Typo="Typo.h6" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.EditNote" Class="mr-1" />表单组件
+        </MudText>
         <ComponentMappingTable Components="_formComponents" />
-    </MudTabPanel>
-    <MudTabPanel Text="布局组件" Icon="@Icons.Material.Filled.ViewModule">
+    </div>
+    <div>
+        <MudText Typo="Typo.h6" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.ViewModule" Class="mr-1" />布局组件
+        </MudText>
         <ComponentMappingTable Components="_layoutComponents" />
-    </MudTabPanel>
-    <MudTabPanel Text="展示组件" Icon="@Icons.Material.Filled.Preview">
+    </div>
+    <div>
+        <MudText Typo="Typo.h6" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Preview" Class="mr-1" />展示组件
+        </MudText>
         <ComponentMappingTable Components="_displayComponents" />
-    </MudTabPanel>
-    <MudTabPanel Text="交互组件" Icon="@Icons.Material.Filled.TouchApp">
+    </div>
+    <div>
+        <MudText Typo="Typo.h6" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.TouchApp" Class="mr-1" />交互组件
+        </MudText>
         <ComponentMappingTable Components="_interactiveComponents" />
-    </MudTabPanel>
-</MudTabs>
+    </div>
+</MudStack>
 
 @code {
     private List<ComponentMappingTable.ComponentInfo> _allComponents = new();

@@ -16,18 +16,21 @@ public record GenerateDslFromNlpCommand(
 
 public class GenerateDslFromNlpCommandHandler : IRequestHandler<GenerateDslFromNlpCommand, Result<DslPage>>
 {
-    private readonly IDslGenerator _dslGenerator;
+    private readonly IDslGeneratorResolver _generatorResolver;
 
-    public GenerateDslFromNlpCommandHandler(IDslGenerator dslGenerator)
+    public GenerateDslFromNlpCommandHandler(IDslGeneratorResolver generatorResolver)
     {
-        _dslGenerator = dslGenerator;
+        _generatorResolver = generatorResolver;
     }
 
     public async Task<Result<DslPage>> Handle(GenerateDslFromNlpCommand request, CancellationToken ct)
     {
         try
         {
-            var dsl = await _dslGenerator.GenerateFromNlpAsync(
+            // NLP 链路默认走 LLM（未配置 LLM 时由 Resolver 自动降级为模板正则解析）
+            var generator = _generatorResolver.Resolve(request.Options?.Provider, DslGeneratorProviders.Llm);
+
+            var dsl = await generator.GenerateFromNlpAsync(
                 request.Description,
                 request.UserContext,
                 request.Options ?? new GenerateOptions(),

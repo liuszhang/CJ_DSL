@@ -4,6 +4,9 @@
     <AssemblyName>CJDSL.Blazor</AssemblyName>
     <RootNamespace>CJDSL.Blazor</RootNamespace>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <!-- .NET 10 预览版 Razor 构建服务器会将生成文件同时输出到 obj 与 obj_tmp 并重复编入，
+         导致 CS0579/CS0101。禁用该服务器以规避（对功能无影响，仅关闭增量构建缓存）。 -->
+    <UseRazorBuildServer>false</UseRazorBuildServer>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +17,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
     <PackageReference Include="MudBlazor" />
+    <PackageReference Include="MudBlazor.Markdown" />
     <PackageReference Include="Jint" />
   </ItemGroup>
 
