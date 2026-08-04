@@ -16,7 +16,8 @@ public class SelectRenderer : IDslComponentRenderer
         builder.AddAttribute(sequence++, "Value", stringValue);
         builder.AddAttribute(sequence++, "ValueChanged", EventCallback.Factory.Create<string>(this, v =>
         {
-            context.DataStore.Set(component.FieldName ?? component.Id, v);
+            // 同 TextRenderer：必须经 SetFieldValue 写入（DataStore + FormState），否则表单提交收集不到。
+            context.SetFieldValue(component.FieldName ?? component.Id, v);
         }));
         builder.AddAttribute(sequence++, "Label", component.Label);
         builder.AddAttribute(sequence++, "Required", GetComponentBoolProp(component, "Required"));
