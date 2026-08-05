@@ -10,7 +10,10 @@ public class SelectRenderer : IDslComponentRenderer
     public RenderFragment Render(DslComponent component, DslRenderContext context) => builder =>
     {
         var sequence = 0;
-        var stringValue = context.DataStore.GetString(component.DataBind) ?? "";
+        // 2026-08-05 修复：初始值优先读 FieldName（data.{FieldName} 回显通道），其次 DataBind。
+        var stringValue = !string.IsNullOrEmpty(component.FieldName)
+            ? context.GetFieldValue(component.FieldName)?.ToString() ?? ""
+            : context.DataStore.GetString(component.DataBind) ?? "";
 
         builder.OpenComponent<MudBlazor.MudSelect<string>>(sequence++);
         builder.AddAttribute(sequence++, "Value", stringValue);
@@ -66,6 +69,15 @@ public class SelectRenderer : IDslComponentRenderer
 
     private static List<SelectItem> GetSelectItems(DslComponent component, DslRenderContext context)
     {
+        // 2026-08-05：内嵌 items（FieldsToDslConverter 生成 props["items"] = [{value,label}...]）
+        if (component.Props?.GetValueOrDefault("items") is List<Dictionary<string, object>> propItems)
+        {
+            return propItems.Select(d => new SelectItem
+            {
+                Value = d.GetValueOrDefault("value")?.ToString() ?? "",
+                Label = d.GetValueOrDefault("label")?.ToString() ?? ""
+            }).ToList();
+        }
         if (component.DataSource?.Type == "dictionary" || component.DataSource?.Type == "enum")
         {
             return context.DataStore.GetList<SelectItem>($"dict.{component.DataSource.Code}") ?? new List<SelectItem>();

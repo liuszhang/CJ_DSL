@@ -387,7 +387,12 @@
         if (string.IsNullOrEmpty(Component.FieldName)) return;
 
         var initial = Context.GetFieldValue(Component.FieldName);
-        if (initial == null) return;
+        if (initial == null)
+        {
+            System.Diagnostics.Debug.WriteLine($"[DslComponentRenderer] {Component.Type} 无初始值: field={Component.FieldName} (DataStore={Context.DataStore.Get($"data.{Component.FieldName}")})");
+            return;
+        }
+        System.Diagnostics.Debug.WriteLine($"[DslComponentRenderer] {Component.Type} 初始值: field={Component.FieldName} = {initial} (type={initial.GetType().Name})");
 
         switch (Component.Type)
         {
@@ -399,10 +404,14 @@
                 break;
             case "number":
             case "slider":
+                // 2026-08-05：支持字符串初始值（DSL 预填经 DataStore 注入为 string），否则 _ => 0m 丢失回显
                 _decimalValue = initial switch
                 {
                     decimal d => d,
                     int i => i,
+                    double db => (decimal)db,
+                    long l => l,
+                    string s when decimal.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var dv) => dv,
                     _ => 0m
                 };
                 break;
@@ -421,7 +430,8 @@
                 break;
             case "switch":
             case "checkbox":
-                _boolValue = initial is bool b && b;
+                // 2026-08-05：支持字符串初始值（DSL 预填经 DataStore 注入为 string "true"/"false"）
+                _boolValue = initial is bool b ? b : bool.TryParse(initial.ToString(), out var bv) && bv;
                 break;
             case "rating":
                 _intValue = initial is int ri ? ri : 0;

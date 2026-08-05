@@ -10,7 +10,11 @@ public class TextRenderer : IDslComponentRenderer
     public RenderFragment Render(DslComponent component, DslRenderContext context) => builder =>
     {
         var sequence = 0;
-        var stringValue = context.DataStore.GetString(component.DataBind) ?? "";
+        // 2026-08-05 修复：初始值优先读 FieldName（data.{FieldName} 回显通道——SeedInitialValues 注入的位置），
+        // 其次 DataBind（传统通道）。此前只读 DataBind（转换器不生成）→ 表单回显永远为空。
+        var stringValue = !string.IsNullOrEmpty(component.FieldName)
+            ? context.GetFieldValue(component.FieldName)?.ToString() ?? ""
+            : context.DataStore.GetString(component.DataBind) ?? "";
 
         builder.OpenComponent<MudBlazor.MudTextField<string>>(sequence++);
         builder.AddAttribute(sequence++, "Value", stringValue);

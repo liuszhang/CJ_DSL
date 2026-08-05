@@ -142,6 +142,12 @@ public class DslDataStore
     {
         if (string.IsNullOrEmpty(path)) return null;
         if (path.StartsWith('@')) path = path[1..];
+
+        // 2026-08-05 修复：Set 以整路径为键（如 "data.satelliteCode"），Get 必须先整键精确匹配，
+        // 否则拆段查找（先取 "data" 键）永远返回 null → 表单回显/表达式读取全部失效。
+        if (_data.TryGetValue(path, out var exact)) return exact;
+
+        // 兜底：分段路径解析（兼容嵌套对象/字典路径用法，如 user.name）
         var segments = path.Split('.');
         var current = _data.GetValueOrDefault(segments[0]);
         foreach (var segment in segments[1..])
