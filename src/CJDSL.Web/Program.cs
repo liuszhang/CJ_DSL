@@ -114,7 +114,9 @@ public class Program
         // 模块数据层建表（幂等：CREATE TABLE IF NOT EXISTS）
         await app.Services.EnsureDataDbCreatedAsync();
 
-        app.UseStaticFiles();
+        // 静态资产（.NET 10 必须 MapStaticAssets：UseStaticFiles 不服务 StaticWebAssets 清单资产，
+        // 会导致 _content/_framework/wwwroot 全部回落到首页 HTML —— 2026-08-07 修复）
+        app.MapStaticAssets();
         app.UseAntiforgery();
 
         app.UseCJDSLApi();
@@ -123,9 +125,8 @@ public class Program
         // ★ 模块 J：CJCore LLM 配置 API（/api/llm-config/...）
         app.MapCJCoreLLM();
 
-        // Blazor 组件
-        app.MapRazorComponents<App>()
-            .AddInteractiveServerRenderMode();
+        // Blazor + 模块路由发现（框架统一根组件 FrameworkApp，自动收集 IModule 程序集）
+        app.MapCJCoreRazorComponents();
 
         // 种子数据（供应商预设 + 旧配置迁移）
         await app.Services.RunSeedDataAsync();
