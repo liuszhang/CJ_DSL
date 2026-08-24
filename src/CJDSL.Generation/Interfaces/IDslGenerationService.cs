@@ -1,4 +1,5 @@
 using CJDSL.Domain;
+using CJCore.Abstractions;
 using CJDSL.Domain.Entities.Dsl;
 using CJDSL.Domain.Interfaces;
 

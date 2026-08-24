@@ -5,4 +5,9 @@
     <RootNamespace>CJDSL.Domain</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Result/Result<T> 统一收敛到 CJCore 共享内核，避免 CJDSL 与 CJCore 各定义一份造成困惑 -->
+    <ProjectReference Include="..\..\..\CJCore\src\Framework\CJCore.Framework.Abstractions\CJCore.Framework.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

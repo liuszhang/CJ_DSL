@@ -1,5 +1,6 @@
 using CJDSL.Domain.Interfaces;
 using CJDSL.Infrastructure.Persistence;
+using CJDSL.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

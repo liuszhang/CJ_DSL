@@ -1,7 +1,7 @@
 using CJDSL.Domain;
 using CJDSL.Domain.Entities.Dsl;
 using CJDSL.Domain.Interfaces;
-using CJDSL.Domain.Shared;
+using CJCore.Abstractions;
 using MediatR;
 
 namespace CJDSL.Generation.Commands;

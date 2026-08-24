@@ -21,3 +21,5 @@ bld/
 /.vs
 /src/CJDSL.Web/cjdsl_llm.db
 node_modules
+/.workbuddy
+/.workbuddy/memory/2026-08-24.md
