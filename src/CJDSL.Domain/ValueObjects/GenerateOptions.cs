@@ -40,6 +40,19 @@ public class GenerateOptions
     /// 为空时由各链路使用自身默认值（元模型生成默认 template，NLP/Adapt 默认 llm）。
     /// </summary>
     public string? Provider { get; set; }
+
+    /// <summary>
+    /// 根据目标平台推导推荐渲染器包标识（仅作提示，前端按自身能力选择）。
+    /// </summary>
+    public static string? ResolveRendererHint(TargetPlatform platform) => platform switch
+    {
+        TargetPlatform.Web => "CJDSL.Blazor",
+        TargetPlatform.Wpf => "CJDSL.Wpf",
+        TargetPlatform.React => "@cj/cjdsl-react",
+        TargetPlatform.Vue => "@cj/cjdsl-vue",
+        TargetPlatform.Maui => "CJDSL.Maui",
+        _ => null
+    };
 }
 
 public class UserPreference

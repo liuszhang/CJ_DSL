@@ -18,3 +18,17 @@
 ## 组件库事实（MudBlazor 9.6.0）
 
 - **无 `MudDateTimePicker` 组件**：可用 picker 仅 `MudDatePicker`/`MudTimePicker`/`MudDateRangePicker`/`MudColorPicker`。datetime 用 `MudDatePicker`+`MudTimePicker` 组合（代码里 `_dateValue.Date.Add(_timeValue)` 合并），已能完整取日期+时间。整改方案 G3 原写"改用 MudDateTimePicker"在该版本不可行，已改为保持组合控件。改 Razor 前先用反射/文档确认组件存在。
+
+## CJDSL 跨产品职责划分决策（2026-08-23，与彦祖敲定）
+
+- **总原则**：自然语言 → CJDSL（转 DSL 统一语言）→ 各产品渲染呈现。CJDSL 对外只暴露两层契约：①统一语言层（Domain 模型，稳定、需版本化治理）；②能力层（渲染器 + 生成器 + 验证）。
+- **生成集中化（已定）**：生成（自然语言→DSL，规则/LLM 双路 + 后处理 + 语义验证）收敛为各产品**直接引用**的独立库 `CJDSL.Generation`（进程内本地生成，抽离自原 Infrastructure/Application）；**无独立 HTTP 生成服务、无 `CJDSL.Generation.Client`、无 Service Token**；各产品不再各自 `AddCJDSLInfrastructure()`，改为 `AddCJDSLGeneration()+AddCJDSLPersistence()`。
+- **渲染集中化（已定）**：渲染 Web Component 化（框架无关 JS Custom Element `<cjdsl-page>`），bundle 由单独项目 `CJDSL.WebComponent` 集中构建、各产品直接引用；`CJDSL.Web` 退居内部设计/自测器（不托管 bundle）；各产品为瘦客户端持容器，**不再各自引用/编译 `CJDSL.Blazor` / `CJDSL.React` 本地渲染**。
+- **ABWork 需跟随改造**：它当前 `AddCJDSLInfrastructure()` + 本地 `CJDSL.Blazor`/`CJDSL.React`，集中化后改为调集中生成服务 + 集中渲染，去掉本地 Infrastructure 与本地渲染包。
+- **待决分叉点（设计树尚未敲定）**：
+  1. 集中渲染的交付形态（已定）：**Web Component 化**（Custom Element，框架无关 JS 渲染器，集中构建一份 bundle，各产品加载同一份嵌入；解决 Liuvis/CJPlug 非 MudBlazor 绑定问题）。现有 `CJDSL.Blazor` 退居 CJDSL.Web 内部自测/服务内渲染，对外统一走 Web Component。
+  2. 交互与业务数据归属（已定 β）：数据归属各产品。Web Component 把业务动作通过 `CustomEvent`（如 `cjdsl-action` 带 payload）抛回宿主，宿主调自己的后端 API 落库；CJDSL.Web 不背业务数据，保持纯生成+渲染引擎。
+  3. Web Component ↔ 宿主桥接契约（已定）：标准化 CustomEvent 契约——固定事件 `cjdsl-action`/`cjdsl-ready` + payload schema `{action,objectCode,data,context}`；`action` 复用现有 `DslEventDispatcher` 的 9 种 handler 语义（apiCall/submit/validate/navigate/refresh/setvalue/export…）；宿主回传经 Web Component 暴露的 property/method（如 `el.applyResult(...)`）。CJDSL 提供 TS 类型 + 文档。
+  4. 集中服务的鉴权与多调用方识别：因生成改为库直接引用（无 HTTP 服务），原「服务间令牌」决策**已撤销**；生成库的 LLM 凭证由各产品经**自身 CJCore 配置**提供，CJDSL.Web 不鉴权调用方。
+  5. DSL 契约版本治理（已定）：**单活版本（永远最新）**——DSL 模型（Domain）与 Web Component bundle 不分版本，始终拉最新；CJDSL.Web 也永远最新。代价：breaking change 会全产品同时受影响，须以"全产品 CI 回归 + DSL 变更评审"纪律兜底（无版本隔离/灰度）。
+- **游离在版图外的产品**：CJPlug / Liuvis 当前不引用 CJDSL；Liuvis 非 MudBlazor 技术栈，若纳入需解决渲染器技术栈绑定（集中渲染后此矛盾缓解，因各产品只持容器）。

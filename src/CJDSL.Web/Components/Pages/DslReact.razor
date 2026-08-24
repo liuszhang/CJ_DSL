@@ -1,0 +1,175 @@
+@page "/dsl-react"
+@rendermode RenderMode.InteractiveServer
+@using CJDSL.Domain
+@using CJDSL.Domain.Entities.Dsl
+@using System.Text.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Web" Class="mr-2" />DSL 跨平台入口（React / Vue / Wpf）
+</MudText>
+
+<MudText Typo="Typo.body2" Class="mb-4" Color="Color.Default">
+    本页用于指定目标渲染平台并生成 DSL。选择 <b>React</b> 平台时，下方会给出可由
+    <code>@("@cj/cjdsl-react")</code>（DSH 内置渲染器）直接消费的载荷，复制后粘贴进 DSH 即可渲染；
+    Web 平台则使用 CJDSL.Blazor 就地渲染。
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="5">
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-2">
+                <MudText Typo="Typo.h6">DSL JSON</MudText>
+                <MudStack Row="true" Spacing="1">
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@FetchFromApi">从接口拉取</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@RenderPreview">解析</MudButton>
+                </MudStack>
+            </MudStack>
+
+            <MudTextField T="string" @bind-Value="_dslInput" Label="DSL JSON" Lines="18" Variant="Variant.Outlined"
+                          Immediate="true" Class="mb-2" Style="font-family: Consolas, Monaco, monospace;" />
+
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudSelect T="string" Label="目标平台" @bind-Value="_platform" Style="min-width: 160px;">
+                    @foreach (var p in _platforms)
+                    {
+                        <MudSelectItem T="string" Value="@p">@p</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@ApplyPlatform" Disabled="string.IsNullOrWhiteSpace(_dslInput)">
+                    套用平台
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="7">
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-2">
+                <MudText Typo="Typo.h6">解析结果</MudText>
+                @if (_page != null)
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.CheckCircle">
+                        @(_page.Layout) · @_page.Components.Count 个组件 · 渲染器：@(_page.RendererHint ?? "—")
+                    </MudChip>
+                }
+            </MudStack>
+
+            @if (_platform == "React")
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-2">
+                    已选定 <b>React</b> 平台，推荐渲染器：<code>@("@cj/cjdsl-react")</code>。
+                    下方「复制 React 载荷」可将 DSL 包装为 <code>CJDSL_PAYLOAD:</code> 文本，粘贴进 DSH WebView 即可由 React 渲染器呈现。
+                </MudAlert>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@CopyReactPayload" Disabled="_page == null">
+                    复制 React 载荷（CJDSL_PAYLOAD:）
+                </MudButton>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Normal" Class="mb-2">
+                    当前平台 <b>@_platform</b>，推荐渲染器：<code>@(_rendererHint ?? "—")</code>。
+                    该平台由对应宿主渲染器（Blazor/Wpf/Vue）承载。
+                </MudAlert>
+            }
+
+            <MudDivider Class="my-3" />
+
+            <pre style="white-space: pre-wrap; word-break: break-all; font-size: 12px; background: var(--mud-palette-surface); padding: 12px; border-radius: 4px;">
+@_previewText</pre>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string _dslInput = "";
+    private string _platform = "React";
+    private CJDSL.Domain.Entities.Dsl.DslPage? _page;
+    private string? _rendererHint;
+    private string _previewText = "在左侧输入 DSL JSON（或点击「从接口拉取」）并点击「解析」。";
+
+    private readonly string[] _platforms = { "Web", "Wpf", "Maui", "React", "Vue" };
+
+    private void RenderPreview()
+    {
+        _page = null;
+        _rendererHint = null;
+        _previewText = "";
+        if (string.IsNullOrWhiteSpace(_dslInput))
+        {
+            _previewText = "请输入 DSL JSON";
+            return;
+        }
+        try
+        {
+            _page = JsonSerializer.Deserialize<CJDSL.Domain.Entities.Dsl.DslPage>(_dslInput, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (_page == null)
+            {
+                _previewText = "解析结果为空";
+                return;
+            }
+            _platform = _page.TargetPlatform.ToString();
+            _rendererHint = _page.RendererHint ?? GenerateOptions.ResolveRendererHint(_page.TargetPlatform);
+            _previewText = JsonSerializer.Serialize(_page, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex)
+        {
+            _previewText = $"JSON 解析失败: {ex.Message}";
+        }
+    }
+
+    private async Task FetchFromApi()
+    {
+        try
+        {
+            var page = await Http.GetFromJsonAsync<CJDSL.Domain.Entities.Dsl.DslPage>("/api/dsl/page/demo_repair");
+            if (page != null)
+            {
+                _dslInput = JsonSerializer.Serialize(page, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                _platform = page.TargetPlatform.ToString();
+                RenderPreview();
+            }
+            else
+            {
+                Snackbar.Add("未获取到 DSL", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"拉取失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ApplyPlatform()
+    {
+        if (_page == null) { RenderPreview(); return; }
+        _page.TargetPlatform = Enum.Parse<CJDSL.Domain.TargetPlatform>(_platform);
+        _page.RendererHint = GenerateOptions.ResolveRendererHint(_page.TargetPlatform);
+        _rendererHint = _page.RendererHint;
+        _dslInput = JsonSerializer.Serialize(_page, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    }
+
+    private async Task CopyReactPayload()
+    {
+        if (_page == null) return;
+        var payload = new
+        {
+            ok = true,
+            render = new { mode = "card", dsl = _page },
+            generated = false
+        };
+        var text = "CJDSL_PAYLOAD:" + JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = false });
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            Snackbar.Add("CJDSL_PAYLOAD 已复制到剪贴板，可粘贴进 DSH 由 React 渲染器呈现", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add("复制失败，请在下方文本框手动复制", Severity.Warning);
+        }
+        _previewText = text;
+    }
+}

@@ -74,7 +74,8 @@ public class Program
 
         // CJDSL 各层服务
         builder.Services.AddCJDSLApi();
-        builder.Services.AddCJDSLInfrastructure(builder.Configuration);
+        builder.Services.AddCJDSLGeneration(builder.Configuration);
+        builder.Services.AddCJDSLPersistence(builder.Configuration);
         builder.Services.AddDslRenderers();
 
         // ★ 模块 J：LLM 配置收敛到 CJCore（数据层独立 SQLite：cjdsl_llm.db）

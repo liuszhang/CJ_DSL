@@ -1,0 +1,25 @@
+{
+  "name": "@cj/cjdsl-react",
+  "version": "0.1.0",
+  "description": "CJDSL DSL v1 的 React 渲染器（独立于 CJDSL.Web Blazor 渲染器的官方 React 目标平台实现）",
+  "type": "module",
+  "main": "lib/cjs/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": "./lib/cjs/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "node build.cjs"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.1",
+    "typescript": "^5.6.0",
+    "esbuild": "^0.24.2"
+  }
+}

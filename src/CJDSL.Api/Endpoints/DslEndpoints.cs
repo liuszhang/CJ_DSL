@@ -1,5 +1,5 @@
 using CJDSL.Application.Dsl;
-using CJDSL.Application.Dsl.Commands;
+using CJDSL.Generation.Commands;
 using CJDSL.Application.Dsl.Queries;
 using CJDSL.Domain;
 using CJDSL.Domain.Entities.Dsl;

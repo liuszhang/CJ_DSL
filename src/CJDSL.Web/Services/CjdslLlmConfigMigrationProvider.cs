@@ -2,7 +2,7 @@ using CJCore.Framework.Abstractions;
 using CJCore.Modules.Data;
 using CJCore.Modules.LLM.Model;
 using CJDSL.Domain.Configuration;
-using CJDSL.Infrastructure.Configuration;
+using CJDSL.Generation.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

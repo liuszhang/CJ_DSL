@@ -1,11 +1,5 @@
-using CJCore.LLM.LLMClient;
-using CJCore.LLM.Structured;
 using CJDSL.Domain.Interfaces;
-using CJDSL.Infrastructure.Caching;
-using CJDSL.Infrastructure.Configuration;
-using CJDSL.Infrastructure.LLM;
 using CJDSL.Infrastructure.Persistence;
-using CJDSL.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,16 +7,16 @@ using Microsoft.Extensions.DependencyInjection;
 namespace CJDSL.Infrastructure;
 
 /// <summary>
-/// Infrastructure 层依赖注入扩展
+/// 持久化层依赖注入扩展。
+/// 仅负责仓储 / EF / 业务数据；「规则 + LLM + 后处理 + 验证」生成能力已迁至 CJDSL.Generation（见 <see cref="CJDSL.Generation.GenerationServiceExtensions"/>）。
+/// CJDSL.Web 以 <c>AddCJDSLGeneration()</c> + <c>AddCJDSLPersistence(configuration)</c> 组合装配。
 /// </summary>
 public static class InfrastructureServiceExtensions
 {
-    public static IServiceCollection AddCJDSLInfrastructure(this IServiceCollection services)
-    {
-        return services.AddCJDSLInfrastructure(null);
-    }
+    public static IServiceCollection AddCJDSLPersistence(this IServiceCollection services)
+        => services.AddCJDSLPersistence(null);
 
-    public static IServiceCollection AddCJDSLInfrastructure(this IServiceCollection services, IConfiguration? configuration)
+    public static IServiceCollection AddCJDSLPersistence(this IServiceCollection services, IConfiguration? configuration)
     {
         var useSqlite = configuration?.GetValue<bool>("CJDSL:Persistence:UseSqlite") ?? false;
 
@@ -44,45 +38,6 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IDslRepository, InMemoryDslRepository>();
             services.AddSingleton<IBusinessDataService, InMemoryBusinessDataService>();
         }
-
-        // 生成器
-        services.AddSingleton<TemplateDslGenerator>();
-        services.AddSingleton<IDslGenerator>(sp => sp.GetRequiredService<TemplateDslGenerator>());
-        services.AddScoped<LlmDslGenerator>();
-        // 生成器解析器：按 provider（template|llm）动态选择，LLM 未配置时自动降级模板并告警
-        services.AddScoped<IDslGeneratorResolver, DslGeneratorResolver>();
-
-        // 缓存
-        services.AddSingleton<IDslCache, InMemoryDslCache>();
-
-        // 表达式引擎
-        services.AddSingleton<IExpressionEvaluator, JintExpressionEvaluator>();
-
-        // 验证器
-        services.AddSingleton<IDslValidator, DslSemanticValidator>();
-        // 安全校验器（表达式沙箱 / endpoint 白名单 / 富文本清洗）
-        services.AddSingleton<IDslSecurityValidator, DslSecurityValidator>();
-
-        // 系统配置服务
-        services.AddSingleton<SystemConfigService>();
-
-        // LLM Prompt 构建器
-        services.AddSingleton<IDslPromptBuilder, DslPromptBuilder>();
-
-        // ★ 模块 J：LLM 客户端栈收敛到 CJCore
-        // - ILLMConfigReader(DB) + ILLMChatService：CJCore 官方注册入口
-        // - ILLMClient → DbConfiguredLLMClient：每次调用前从 DB 读默认模型配置
-        // - IStructuredLLMClient：强类型结构化输出（LlmDslGenerator 消费）
-        services.AddHttpClient();
-        services.AddLLMChatService();
-        services.AddHttpClient<CJCore.LLM.Abstractions.ILLMClient, LLM.DbConfiguredLLMClient>();
-        services.AddCJCoreStructuredLLM();
-
-        // HTTP 客户端
-        services.AddHttpClient("DslApi", client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(30);
-        });
 
         return services;
     }

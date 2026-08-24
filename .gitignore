@@ -20,3 +20,4 @@ bld/
 [Ll]ogs/
 /.vs
 /src/CJDSL.Web/cjdsl_llm.db
+node_modules

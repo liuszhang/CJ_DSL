@@ -9,6 +9,7 @@
     <ProjectReference Include="..\CJDSL.Api\CJDSL.Api.csproj" />
     <ProjectReference Include="..\CJDSL.Blazor\CJDSL.Blazor.csproj" />
     <ProjectReference Include="..\CJDSL.Infrastructure\CJDSL.Infrastructure.csproj" />
+    <ProjectReference Include="..\CJDSL.Generation\CJDSL.Generation.csproj" />
     <ProjectReference Include="..\..\..\CJCore\src\Framework\CJCore.Framework\CJCore.Framework.csproj" />
     <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.Modules.LLM\CJCore.Modules.LLM.csproj" />
     <!-- 模块 J：显式引用 Data.Model，提供 AddCJCoreLLM 的 dataOptions 参数类型 DataModuleOptions -->

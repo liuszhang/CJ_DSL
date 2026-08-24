@@ -22,6 +22,12 @@ public class DslPage
     /// </summary>
     public TargetPlatform TargetPlatform { get; set; } = TargetPlatform.Web;
 
+    /// <summary>
+    /// 推荐渲染器包标识（仅作提示，前端可按需选择）。
+    /// React 平台输出由 @cj/cjdsl-react 消费；Web 由 CJDSL.Blazor 消费；Wpf 由 CJDSL.Wpf 消费。
+    /// </summary>
+    public string? RendererHint { get; set; }
+
     public DslDataSource? DataSource { get; set; }
     public DslPermission? Permission { get; set; }
     public DslResponsive? Responsive { get; set; }

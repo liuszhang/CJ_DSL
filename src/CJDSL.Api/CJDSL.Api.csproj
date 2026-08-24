@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CJDSL.Application\CJDSL.Application.csproj" />
     <ProjectReference Include="..\CJDSL.Infrastructure\CJDSL.Infrastructure.csproj" />
+    <ProjectReference Include="..\CJDSL.Generation\CJDSL.Generation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

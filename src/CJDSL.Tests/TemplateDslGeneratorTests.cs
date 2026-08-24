@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using CJDSL.Domain.Entities.MetaModel;
 using CJDSL.Domain;
-using CJDSL.Infrastructure.Services;
+using CJDSL.Generation.Services;
 using FluentAssertions;
 using Xunit;
 

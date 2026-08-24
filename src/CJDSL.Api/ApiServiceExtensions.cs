@@ -17,10 +17,10 @@ public static class ApiServiceExtensions
         });
 
         // MediatR
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Application.Dsl.Commands.GenerateDslCommand).Assembly));
+        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Application.Dsl.Queries.GetDslQuery).Assembly));
 
         // FluentValidation
-        services.AddValidatorsFromAssembly(typeof(Application.Dsl.Commands.GenerateDslCommand).Assembly);
+        services.AddValidatorsFromAssembly(typeof(Application.Dsl.Queries.GetDslQuery).Assembly);
 
         // Swagger
         services.AddEndpointsApiExplorer();

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>CJDSL.Generation</AssemblyName>
+    <RootNamespace>CJDSL.Generation</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CJDSL.Domain\CJDSL.Domain.csproj" />
+    <!-- CJCore 共享 LLM 模块（模块 J：LLM 收敛，客户端栈 + DB 配置读取 + 结构化输出） -->
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.Abstractions\CJCore.LLM.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.LLMClient\CJCore.LLM.LLMClient.csproj" />
+    <ProjectReference Include="..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.Structured\CJCore.LLM.Structured.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Jint" />
+    <PackageReference Include="HtmlSanitizer" />
+  </ItemGroup>
+
+</Project>
