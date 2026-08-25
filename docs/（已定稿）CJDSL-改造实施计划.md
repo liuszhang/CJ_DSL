@@ -113,8 +113,12 @@
 - **B3.1** `api.ts` 的 `/api/cjdsl/action` 从 echo 改为 `registerActionHandler` 真实持久化（MVP 可先用本地文件/内存占位，证明 β 闭环）；落库归属见 §8.1。
 
 ### B4 引用 CJDSL.Generation 库本地生成
-- **B4.1** `DA.DSHPlug.CJDSL` 直接引用 `CJDSL.Generation` 库（npm/.NET 封装），进程内调用 `generateDslFromIntent`，不再 HTTP 调 `CJDSL.Web`。
-- **B4.2** 去掉模型直出兜底，统一走 `CJDSL.Generation` 库生成（§8.5 已定仅库生成）。
+> **2026-08-24 决策变更**：原 B4.1「MAUI 内嵌 Kestrel 承载 CJDSL.Generation」已撤销（用户要求不要内嵌 Kestrel、不要做成服务）；
+> 改为在 **CJDSL 项目内新建 `CJDSL.Generation.TS`**（`src/CJDSL.Generation.TS`，npm 包 `@cj/cjdsl-generation-ts`），
+> 作为**静态工具库**形态：LLM 凭证由调用方显式传入（`generateFromNlp(text, {apiKey, baseUrl, model})`），
+> 零常驻服务、不内嵌 Kestrel、不 HTTP 调 CJDSL.Web。DA.DSHPlug.CJDSL 通过 build.mjs alias 引用其源码。
+- **B4.1** `DA.DSHPlug.CJDSL` 引用 CJDSL 官方静态生成库 `@cj/cjdsl-generation-ts`（位于 `CJDSL/src/CJDSL.Generation.TS`），进程内直接 `generateFromNlp(intent, creds)`，不再 HTTP 调 `CJDSL.Web`、不再内嵌 Kestrel。
+- **B4.2** 去掉模型直出兜底，统一走 `@cj/cjdsl-generation-ts` 静态库生成（§8.5 已定仅库生成）；生成库凭证缺失时直接报错，不引导模型直出 DSL。
 
 ---
 
@@ -125,14 +129,14 @@
 2. 启 `DA.DSH.PA`（MAUI → DSH Web → 加载 `DA.DSHPlug.CJDSL`）。
 3. DSH 触发 `cjdsl_render` → 看到 `<cjdsl-page>` 渲染的卡片。
 4. 点提交按钮 → 宿主收到 `cjdsl-action` → `/api/cjdsl/action` 落库成功回执。
-5. 触发生成 → `DA.DSHPlug.CJDSL` 进程内 `CJDSL.Generation` 库产出 DSL（查本地日志确认）。
+5. 触发生成 → `DA.DSHPlug.CJDSL` 进程内调用 `@cj/cjdsl-generation-ts` 静态库（凭证由 pluginConfig/环境变量注入）产出 DSL（查本地日志确认）。
 
 ### 6.2 验收标准（逐条核对）
 - [ ] `<cjdsl-page>` 以 Web Component 形态正常渲染（非 React slot 直出）。
 - [ ] 业务动作经 `cjdsl-action` 回宿主，而非 Web Component 内直接同域 fetch。
 - [ ] `/api/cjdsl/action` 真实落库（非 echo）。
-- [ ] `DA.DSHPlug.CJDSL` 通过 `CJDSL.Generation` 库本地生成 DSL（非 HTTP 调 CJDSL.Web）。
-- [ ] 生成统一走 `CJDSL.Generation` 库，已去除模型直出兜底通道（§8.5 已定仅库生成）。
+- [ ] `DA.DSHPlug.CJDSL` 通过 `@cj/cjdsl-generation-ts` 静态库本地生成 DSL（非 HTTP 调 CJDSL.Web、非 MAUI 内嵌 Kestrel）。
+- [ ] 生成统一走 `@cj/cjdsl-generation-ts` 静态库，已去除模型直出兜底通道（§8.5 已定仅库生成）。
 
 ---
 

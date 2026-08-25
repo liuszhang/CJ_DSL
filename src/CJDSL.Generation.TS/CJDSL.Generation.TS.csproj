@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>CJDSL.Generation.TS</RootNamespace>
+    <AssemblyName>CJDSL.Generation.TS</AssemblyName>
+    <Description>CJDSL 静态生成库（TS 侧，对应 C# CJDSL.Generation 的薄封装；纯 Node/TS，经 build.cjs/esbuild 构建 lib 产物；本 csproj 仅用于在解决方案中浏览与管理前端文件，不参与 C# 编译）</Description>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="src\**\*" />
+    <None Include="build.cjs" />
+    <None Include="package.json" />
+    <None Include="tsconfig.json" />
+  </ItemGroup>
+
+</Project>
