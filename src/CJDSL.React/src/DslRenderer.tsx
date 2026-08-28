@@ -388,6 +388,8 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
   const value = field ? (store.get(`data.${field}`) as string | number | boolean | undefined) ?? "" : "";
   const required = node.props?.Required === true || node.props?.required === true;
   const disabledBase = evalDslExpr(node.disabledIf, store) === true;
+  // 提交乐观锁：表单已提交（__cjdsl_submitted）后，字段整体只读/禁用，防重复填写
+  const submitted = store.get("__cjdsl_submitted") === true;
   const errors = field ? (validationErrors[field] ?? []) : [];
 
   const baseStyle: React.CSSProperties = {
@@ -397,14 +399,16 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
     margin: "6px 0",
   };
   const labelStyle: React.CSSProperties = { fontSize: 13, color: "rgba(0,0,0,0.66)", fontWeight: 500 };
+  const lockBg = disabledBase || submitted ? "#f5f5f5" : "#fff";
+  const lockColor = disabledBase || submitted ? "#9e9e9e" : "inherit";
   const inputStyle: React.CSSProperties = {
     border: errors.length > 0 ? "1px solid #C62828" : "1px solid rgba(0,0,0,0.22)",
     borderRadius: 4,
     padding: "6px 10px",
     fontSize: 14,
     outline: "none",
-    background: disabledBase ? "#f5f5f5" : "#fff",
-    color: disabledBase ? "#9e9e9e" : "inherit",
+    background: lockBg,
+    color: lockColor,
     fontFamily: "inherit",
   };
   const helpStyle: React.CSSProperties = { fontSize: 12, color: "#888" };
@@ -424,6 +428,7 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
             type={node.type === "number" ? "number" : "text"}
             value={String(value ?? "")}
             disabled={disabledBase}
+            readOnly={submitted}
             style={inputStyle}
             onChange={(e) => setField(field, node.type === "number" ? Number(e.target.value) : e.target.value)}
           />
@@ -438,6 +443,7 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
           <textarea
             value={String(value ?? "")}
             disabled={disabledBase}
+            readOnly={submitted}
             rows={node.props?.rows ?? node.props?.Lines ?? 3}
             style={inputStyle}
             onChange={(e) => setField(field, e.target.value)}
@@ -450,7 +456,7 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
       return (
         <div style={baseStyle}>
           {node.label && <label style={labelStyle}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
-          <select value={String(value ?? "")} disabled={disabledBase} style={inputStyle} onChange={(e) => setField(field, e.target.value)}>
+          <select value={String(value ?? "")} disabled={disabledBase || submitted} style={inputStyle} onChange={(e) => setField(field, e.target.value)}>
             <option value="">请选择</option>
             {itemsOf(node).map((it, i) => (
               <option key={i} value={it.value} disabled={it.disabled}>{it.label}</option>
@@ -464,7 +470,7 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
       return (
         <div style={baseStyle}>
           {node.label && <label style={labelStyle}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
-          <input type="date" value={String(value ?? "")} disabled={disabledBase} style={inputStyle} onChange={(e) => setField(field, e.target.value)} />
+          <input type="date" value={String(value ?? "")} disabled={disabledBase} readOnly={submitted} style={inputStyle} onChange={(e) => setField(field, e.target.value)} />
           {errors.map((e, i) => <div key={i} style={errorStyle}>{e}</div>)}
           {node.helpText && <div style={helpStyle}>{node.helpText}</div>}
         </div>
@@ -472,11 +478,11 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
     case "switch":
       return (
         <div style={baseStyle}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase ? "not-allowed" : "pointer" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase || submitted ? "not-allowed" : "pointer" }}>
             <input
               type="checkbox"
               checked={value === true || value === "true" || value === 1}
-              disabled={disabledBase}
+              disabled={disabledBase || submitted}
               onChange={(e) => setField(field, e.target.checked)}
             />
             {node.label}{required && <span style={{ color: "#c62828" }}> *</span>}
@@ -492,7 +498,9 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
 
 // ── 按钮 ────────────────────────────────────────────────────────────
 function ButtonView({ node, store, onEvent }: { node: DslNode; store: DslStore; onEvent: (ev: DslEvent) => Promise<void> }) {
-  const disabled = evalDslExpr(node.disabledIf, store) === true;
+  // 提交乐观锁：表单已提交（__cjdsl_submitted）后，所有按钮置灰防重复点击；失败时由 applyResult 清除该标志解锁
+  const submitted = store.get("__cjdsl_submitted") === true;
+  const disabled = evalDslExpr(node.disabledIf, store) === true || submitted;
   const variant = node.props?.variant ?? node.props?.Variant ?? "text";
   const color = node.props?.color ?? node.props?.Color ?? "default";
   const colorMap: Record<string, [string, string]> = {

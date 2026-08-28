@@ -18,7 +18,7 @@ import {
 } from "@cj/cjdsl-react";
 
 const BASE_STYLE = `
-  :host { display: block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; color: rgba(0,0,0,0.87); }
+  :host { position: relative; display: block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; color: rgba(0,0,0,0.87); }
   * { box-sizing: border-box; }
   #cjdsl-toast { position: absolute; top: 8px; left: 8px; right: 8px; padding: 8px 12px; border-radius: 6px; font-size: 13px; z-index: 999; display: none; box-shadow: 0 2px 8px rgba(0,0,0, 0.18); }
 `;
@@ -86,6 +86,9 @@ export class CjdslPage extends HTMLElement {
     refresh?: boolean;
   }): void {
     if (result.setValues) this.store.merge(result.setValues);
+    // 提交锁收尾：成功保持锁定（按钮置灰+字段只读）；失败解锁允许重试
+    if (result.ok === true) this.store.set("__cjdsl_submitted", true);
+    else if (result.ok === false) this.store.set("__cjdsl_submitted", false);
     if (result.message) {
       this.showToast(result.message, result.severity || (result.ok === false ? "error" : "info"));
     }
@@ -165,6 +168,8 @@ export class CjdslPage extends HTMLElement {
     return {
       mode: this.getAttribute("mode") || undefined,
       onSubmit: (ctx) => {
+        // 乐观锁：点击即置灰表单、禁用按钮，防连点重复提交（失败由 applyResult 解锁）
+        this.store.set("__cjdsl_submitted", true);
         this.dispatchAction({
           type: "submit",
           action: ctx.action,

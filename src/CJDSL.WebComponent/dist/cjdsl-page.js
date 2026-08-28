@@ -25212,6 +25212,7 @@ var CjdslWebComponent = (() => {
     const value = field ? store.get(`data.${field}`) ?? "" : "";
     const required = node.props?.Required === true || node.props?.required === true;
     const disabledBase = evalDslExpr(node.disabledIf, store) === true;
+    const submitted = store.get("__cjdsl_submitted") === true;
     const errors = field ? validationErrors[field] ?? [] : [];
     const baseStyle = {
       display: "flex",
@@ -25220,14 +25221,16 @@ var CjdslWebComponent = (() => {
       margin: "6px 0"
     };
     const labelStyle = { fontSize: 13, color: "rgba(0,0,0,0.66)", fontWeight: 500 };
+    const lockBg = disabledBase || submitted ? "#f5f5f5" : "#fff";
+    const lockColor = disabledBase || submitted ? "#9e9e9e" : "inherit";
     const inputStyle = {
       border: errors.length > 0 ? "1px solid #C62828" : "1px solid rgba(0,0,0,0.22)",
       borderRadius: 4,
       padding: "6px 10px",
       fontSize: 14,
       outline: "none",
-      background: disabledBase ? "#f5f5f5" : "#fff",
-      color: disabledBase ? "#9e9e9e" : "inherit",
+      background: lockBg,
+      color: lockColor,
       fontFamily: "inherit"
     };
     const helpStyle = { fontSize: 12, color: "#888" };
@@ -25249,6 +25252,7 @@ var CjdslWebComponent = (() => {
               type: node.type === "number" ? "number" : "text",
               value: String(value ?? ""),
               disabled: disabledBase,
+              readOnly: submitted,
               style: inputStyle,
               onChange: (e) => setField(field, node.type === "number" ? Number(e.target.value) : e.target.value)
             }
@@ -25267,6 +25271,7 @@ var CjdslWebComponent = (() => {
             {
               value: String(value ?? ""),
               disabled: disabledBase,
+              readOnly: submitted,
               rows: node.props?.rows ?? node.props?.Lines ?? 3,
               style: inputStyle,
               onChange: (e) => setField(field, e.target.value)
@@ -25281,7 +25286,7 @@ var CjdslWebComponent = (() => {
             node.label,
             required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { value: String(value ?? ""), disabled: disabledBase, style: inputStyle, onChange: (e) => setField(field, e.target.value), children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { value: String(value ?? ""), disabled: disabledBase || submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value), children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "\u8BF7\u9009\u62E9" }),
             itemsOf(node).map((it, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: it.value, disabled: it.disabled, children: it.label }, i))
           ] }),
@@ -25294,19 +25299,19 @@ var CjdslWebComponent = (() => {
             node.label,
             required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "date", value: String(value ?? ""), disabled: disabledBase, style: inputStyle, onChange: (e) => setField(field, e.target.value) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "date", value: String(value ?? ""), disabled: disabledBase, readOnly: submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value) }),
           errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
           node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
         ] });
       case "switch":
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase ? "not-allowed" : "pointer" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase || submitted ? "not-allowed" : "pointer" }, children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "input",
               {
                 type: "checkbox",
                 checked: value === true || value === "true" || value === 1,
-                disabled: disabledBase,
+                disabled: disabledBase || submitted,
                 onChange: (e) => setField(field, e.target.checked)
               }
             ),
@@ -25321,7 +25326,8 @@ var CjdslWebComponent = (() => {
     }
   }
   function ButtonView({ node, store, onEvent }) {
-    const disabled = evalDslExpr(node.disabledIf, store) === true;
+    const submitted = store.get("__cjdsl_submitted") === true;
+    const disabled = evalDslExpr(node.disabledIf, store) === true || submitted;
     const variant = node.props?.variant ?? node.props?.Variant ?? "text";
     const color = node.props?.color ?? node.props?.Color ?? "default";
     const colorMap = {
@@ -25542,7 +25548,7 @@ var CjdslWebComponent = (() => {
 
   // src/cjdsl-page.ts
   var BASE_STYLE = `
-  :host { display: block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; color: rgba(0,0,0,0.87); }
+  :host { position: relative; display: block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; color: rgba(0,0,0,0.87); }
   * { box-sizing: border-box; }
   #cjdsl-toast { position: absolute; top: 8px; left: 8px; right: 8px; padding: 8px 12px; border-radius: 6px; font-size: 13px; z-index: 999; display: none; box-shadow: 0 2px 8px rgba(0,0,0, 0.18); }
 `;
@@ -25595,6 +25601,8 @@ var CjdslWebComponent = (() => {
     /** 宿主回传结果（方案：宿主回传经 Web Component 暴露的方法） */
     applyResult(result) {
       if (result.setValues) this.store.merge(result.setValues);
+      if (result.ok === true) this.store.set("__cjdsl_submitted", true);
+      else if (result.ok === false) this.store.set("__cjdsl_submitted", false);
       if (result.message) {
         this.showToast(result.message, result.severity || (result.ok === false ? "error" : "info"));
       }
@@ -25666,6 +25674,7 @@ var CjdslWebComponent = (() => {
       return {
         mode: this.getAttribute("mode") || void 0,
         onSubmit: (ctx) => {
+          this.store.set("__cjdsl_submitted", true);
           this.dispatchAction({
             type: "submit",
             action: ctx.action,
