@@ -5,7 +5,7 @@
 //  事件：EventDispatcher 分发（submit/apiCall/setValue/chain/showToast/navigate，confirm/onSuccess）。
 //  校验：validate.ts（required/minLength/maxLength/regex/min/max）。
 //  后端依赖通过 EventCallbacks 兜底（onSubmit/onApiCall），避免绑定具体 HTTP 端点。
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DslStore } from "./store";
 import { evalDslExpr } from "./expr";
 import { validateField, type ValidationRule } from "./validate";
@@ -104,6 +104,23 @@ export function DslRenderer(props: RendererProps) {
     const unsub = store.subscribe(() => setVersion((v) => v + 1));
     return unsub;
   }, [store]);
+
+  // 挂载期从节点 props.value 注入初始值（对齐 CJOntology DslMessageRenderer.SeedInitialValues）。
+  // CJDSL 契约：转换器（FieldsToDslConverter）把字段初值写入 props.value，渲染器应在挂载时把其写入
+  // DslStore 的 data.{fieldName}，使输入控件显示预填值。DSH 既往 React 渲染器缺失此步，
+  // 导致 KB 预填与编辑态回显均为空（latent bug，现一并修复）。仅在 root/store 变化时 seed，
+  // 不覆盖用户已输入（用户输入走 store.set，不会触发 root 变化）。
+  useLayoutEffect(() => {
+    const walk = (n: DslNode) => {
+      const field = n.fieldName;
+      if (field) {
+        const v = n.props?.value ?? n.props?.Value;
+        if (v !== undefined && v !== null) store.set(`data.${field}`, v);
+      }
+      if (n.children) n.children.forEach(walk);
+    };
+    walk(root);
+  }, [root, store]);
 
   // 表单值收集
   const values: FormValues = useMemo(() => {
@@ -423,7 +440,7 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
     case "number":
       return (
         <div style={baseStyle}>
-          {node.label && <label style={labelStyle}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
+          {node.label && <label style={labelStyle} data-kb-field={node.fieldName}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
           <input
             type={node.type === "number" ? "number" : "text"}
             value={String(value ?? "")}
@@ -439,7 +456,7 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
     case "textarea":
       return (
         <div style={baseStyle}>
-          {node.label && <label style={labelStyle}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
+          {node.label && <label style={labelStyle} data-kb-field={node.fieldName}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
           <textarea
             value={String(value ?? "")}
             disabled={disabledBase}
@@ -455,7 +472,7 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
     case "select":
       return (
         <div style={baseStyle}>
-          {node.label && <label style={labelStyle}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
+          {node.label && <label style={labelStyle} data-kb-field={node.fieldName}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
           <select value={String(value ?? "")} disabled={disabledBase || submitted} style={inputStyle} onChange={(e) => setField(field, e.target.value)}>
             <option value="">请选择</option>
             {itemsOf(node).map((it, i) => (
@@ -469,7 +486,7 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
     case "date":
       return (
         <div style={baseStyle}>
-          {node.label && <label style={labelStyle}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
+          {node.label && <label style={labelStyle} data-kb-field={node.fieldName}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
           <input type="date" value={String(value ?? "")} disabled={disabledBase} readOnly={submitted} style={inputStyle} onChange={(e) => setField(field, e.target.value)} />
           {errors.map((e, i) => <div key={i} style={errorStyle}>{e}</div>)}
           {node.helpText && <div style={helpStyle}>{node.helpText}</div>}
@@ -478,7 +495,7 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
     case "switch":
       return (
         <div style={baseStyle}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase || submitted ? "not-allowed" : "pointer" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase || submitted ? "not-allowed" : "pointer" }} data-kb-field={node.fieldName}>
             <input
               type="checkbox"
               checked={value === true || value === "true" || value === 1}
@@ -501,6 +518,9 @@ function ButtonView({ node, store, onEvent }: { node: DslNode; store: DslStore; 
   // 提交乐观锁：表单已提交（__cjdsl_submitted）后，所有按钮置灰防重复点击；失败时由 applyResult 清除该标志解锁
   const submitted = store.get("__cjdsl_submitted") === true;
   const disabled = evalDslExpr(node.disabledIf, store) === true || submitted;
+  // 置灰后文案切换：submitted=true 时提交按钮显示"已提交"（仅渲染层切换，不改写 DSL 内容；
+  //   iconButton 保持图标不变，普通按钮统一切换；失败解锁 ok=false 后自动恢复原 label）
+  const label = submitted && node.type !== "iconButton" ? "已提交" : (node.label ?? "");
   const variant = node.props?.variant ?? node.props?.Variant ?? "text";
   const color = node.props?.color ?? node.props?.Color ?? "default";
   const colorMap: Record<string, [string, string]> = {
@@ -525,20 +545,20 @@ function ButtonView({ node, store, onEvent }: { node: DslNode; store: DslStore; 
   if (href && isSafeLink(href)) {
     return (
       <a href={String(href)} {...common}>
-        {node.type === "iconButton" ? (node.props?.icon ?? "⚡") : (node.label ?? "")}
+        {node.type === "iconButton" ? (node.props?.icon ?? "⚡") : label}
       </a>
     );
   }
   if (clickEv) {
     return (
       <button {...common} onClick={() => void onEvent(clickEv)}>
-        {node.type === "iconButton" ? (node.props?.icon ?? "⚡") : (node.label ?? "")}
+        {node.type === "iconButton" ? (node.props?.icon ?? "⚡") : label}
       </button>
     );
   }
   return (
     <button {...common} onClick={() => void onEvent({ type: "click", handler: "showToast", params: { message: "按钮未配置事件", severity: "warning" } })}>
-      {node.type === "iconButton" ? (node.props?.icon ?? "⚡") : (node.label ?? "")}
+      {node.type === "iconButton" ? (node.props?.icon ?? "⚡") : label}
     </button>
   );
 }
@@ -561,5 +581,19 @@ function ChartView({ node }: { node: DslNode }) {
   const width = Number(node.props?.width ?? node.props?.Width ?? 300);
   const height = Number(node.props?.height ?? node.props?.Height ?? 300);
   const svg = buildDonutSvg(data, width, height, chartType === "donut");
+  // 排障日志（临时）：打印 chart 的真实入参与产出，用于确认「数据有没有进来 / total 是否为 0 / SVG 长度」
+  console.info("[cjdsl-page][ChartView]", {
+    chartType,
+    propsKeys: Object.keys(node.props ?? {}),
+    rawLen: raw.length,
+    firstRaw: raw[0],
+    dataLen: data.length,
+    firstData: data[0],
+    total: data.reduce((s, d) => s + (Number(d.value) || 0), 0),
+    width,
+    height,
+    svgLen: svg.length,
+    svgHead: svg.slice(0, 120),
+  });
   return <div style={{ display: "flex", justifyContent: "center", margin: "10px 0" }} dangerouslySetInnerHTML={{ __html: svg }} />;
 }

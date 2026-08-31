@@ -50,3 +50,11 @@ export interface CjdslApplyResult {
   /** 是否强制重新渲染（刷新关联数据源等） */
   refresh?: boolean;
 }
+
+/** cjdsl-json-view 浮层开关 CustomEvent 的 detail 结构（源 JSON 查看按钮，方案 §3.5） */
+export interface CjdslJsonViewerDetail {
+  /** 浮层是否打开 */
+  open: boolean;
+  /** 业务对象编码（缺省取 DSL 根节点 id / 用户上下文 objectCode） */
+  objectCode?: string;
+}

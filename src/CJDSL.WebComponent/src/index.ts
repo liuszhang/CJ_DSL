@@ -7,6 +7,7 @@ import type {
   CjdslContext,
   CjdslReadyDetail,
   CjdslApplyResult,
+  CjdslJsonViewerDetail,
 } from "./types";
 
 export const TAG_NAME = "cjdsl-page";
@@ -28,6 +29,7 @@ export type {
   CjdslContext,
   CjdslReadyDetail,
   CjdslApplyResult,
+  CjdslJsonViewerDetail,
 };
 
 declare global {

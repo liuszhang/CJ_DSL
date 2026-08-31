@@ -11,7 +11,21 @@ const COLORS = [
 
 export function buildDonutSvg(data: PieDatum[], width = 300, height = 300, isDonut = true): string {
   const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
+  console.info("[cjdsl-page][buildDonutSvg]", {
+    dataLen: data.length,
+    total,
+    width,
+    height,
+    isDonut,
+    firstItem: data[0],
+  });
   if (total <= 0) {
+    // 强烈怀疑：90 项 value 全部解析成 0 → 走这里返回「所有值为零」灰色文本，视觉上就是灰框
+    console.warn("[cjdsl-page][buildDonutSvg] total<=0，返回「所有值为零」占位（灰框元凶？）", {
+      dataLen: data.length,
+      firstItem: data[0],
+      rawValues: data.slice(0, 5).map((d) => d.value),
+    });
     return `<div style="color:#999;padding:20px;text-align:center;">所有值为零</div>`;
   }
   const cx = width / 2;
@@ -25,7 +39,6 @@ export function buildDonutSvg(data: PieDatum[], width = 300, height = 300, isDon
     const v = Number(data[i].value) || 0;
     const sweep = (v / total) * 360;
     const end = start + sweep;
-    path += arcPath(cx, cy, outerR, innerR, start, end);
     const color = COLORS[i % COLORS.length];
     const label = data[i].label || `项目${i + 1}`;
     const pct = Math.round((v / total) * 1000) / 10;
@@ -61,4 +74,12 @@ function arcPath(cx: number, cy: number, outerR: number, innerR: number, startDe
 
 function esc(s: unknown): string {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
+
+// 一次性模块加载标记：确认新版 buildDonutSvg（裸 path 文本 bug 已修）已进 bundle。
+// 旧版 for 循环里写了 `path += arcPath(...)` 裸文本，90 项时会膨胀成 36000px 宽覆盖整张图。
+// 看到本行 = 新 bundle 已加载；看不到 = WebView2 仍在用旧 bundle，需要完全重启 DA.DSH.PA。
+if (typeof console !== "undefined" && !(globalThis as { __cjdsl_svg_loaded__?: boolean }).__cjdsl_svg_loaded__) {
+  (globalThis as { __cjdsl_svg_loaded__?: boolean }).__cjdsl_svg_loaded__ = true;
+  console.info("[cjdsl-page] buildDonutSvg v2 loaded (no raw-path-text bug)");
 }
