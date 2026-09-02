@@ -779,7 +779,7 @@ var CjdslWebComponent = (() => {
               forEachFunc.apply(this, arguments);
             }, forEachContext);
           }
-          function toArray(children) {
+          function toArray2(children) {
             return mapChildren(children, function(child) {
               return child;
             }) || [];
@@ -1090,7 +1090,7 @@ var CjdslWebComponent = (() => {
             }
             return dispatcher.useContext(Context);
           }
-          function useState4(initialState) {
+          function useState5(initialState) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useState(initialState);
           }
@@ -1118,7 +1118,7 @@ var CjdslWebComponent = (() => {
             var dispatcher = resolveDispatcher();
             return dispatcher.useCallback(callback, deps);
           }
-          function useMemo4(create, deps) {
+          function useMemo5(create, deps) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useMemo(create, deps);
           }
@@ -1858,7 +1858,7 @@ var CjdslWebComponent = (() => {
             map: mapChildren,
             forEach: forEachChildren,
             count: countChildren,
-            toArray,
+            toArray: toArray2,
             only: onlyChild
           };
           exports.Children = Children;
@@ -1890,10 +1890,10 @@ var CjdslWebComponent = (() => {
           exports.useImperativeHandle = useImperativeHandle;
           exports.useInsertionEffect = useInsertionEffect;
           exports.useLayoutEffect = useLayoutEffect2;
-          exports.useMemo = useMemo4;
+          exports.useMemo = useMemo5;
           exports.useReducer = useReducer;
           exports.useRef = useRef3;
-          exports.useState = useState4;
+          exports.useState = useState5;
           exports.useSyncExternalStore = useSyncExternalStore;
           exports.useTransition = useTransition;
           exports.version = ReactVersion;
@@ -2389,9 +2389,9 @@ var CjdslWebComponent = (() => {
           if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== "undefined" && typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart === "function") {
             __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(new Error());
           }
-          var React5 = require_react();
+          var React6 = require_react();
           var Scheduler = require_scheduler();
-          var ReactSharedInternals = React5.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+          var ReactSharedInternals = React6.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
           var suppressWarning = false;
           function setSuppressWarning(newSuppressWarning) {
             {
@@ -3998,7 +3998,7 @@ var CjdslWebComponent = (() => {
             {
               if (props.value == null) {
                 if (typeof props.children === "object" && props.children !== null) {
-                  React5.Children.forEach(props.children, function(child) {
+                  React6.Children.forEach(props.children, function(child) {
                     if (child == null) {
                       return;
                     }
@@ -23594,7 +23594,7 @@ var CjdslWebComponent = (() => {
       if (true) {
         (function() {
           "use strict";
-          var React5 = require_react();
+          var React6 = require_react();
           var REACT_ELEMENT_TYPE = Symbol.for("react.element");
           var REACT_PORTAL_TYPE = Symbol.for("react.portal");
           var REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
@@ -23620,7 +23620,7 @@ var CjdslWebComponent = (() => {
             }
             return null;
           }
-          var ReactSharedInternals = React5.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+          var ReactSharedInternals = React6.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
           function error(format) {
             {
               {
@@ -24470,11 +24470,11 @@ var CjdslWebComponent = (() => {
               return jsxWithValidation(type, props, key, false);
             }
           }
-          var jsx4 = jsxWithValidationDynamic;
-          var jsxs4 = jsxWithValidationStatic;
+          var jsx5 = jsxWithValidationDynamic;
+          var jsxs5 = jsxWithValidationStatic;
           exports.Fragment = REACT_FRAGMENT_TYPE;
-          exports.jsx = jsx4;
-          exports.jsxs = jsxs4;
+          exports.jsx = jsx5;
+          exports.jsxs = jsxs5;
         })();
       }
     }
@@ -24504,7 +24504,7 @@ var CjdslWebComponent = (() => {
   var import_client = __toESM(require_client(), 1);
 
   // ../CJDSL.React/src/DslRenderer.tsx
-  var import_react = __toESM(require_react(), 1);
+  var import_react2 = __toESM(require_react(), 1);
 
   // ../CJDSL.React/src/expr.ts
   function tokenize(input) {
@@ -24992,8 +24992,375 @@ var CjdslWebComponent = (() => {
     console.info("[cjdsl-page] buildDonutSvg v2 loaded (no raw-path-text bug)");
   }
 
-  // ../CJDSL.React/src/DslRenderer.tsx
+  // ../CJDSL.React/src/flow.tsx
+  var import_react = __toESM(require_react(), 1);
   var import_jsx_runtime = __toESM(require_jsx_runtime(), 1);
+  var FLOW_STYLE_KEYS = /* @__PURE__ */ new Set(["class", "color", "backgroundColor", "margin", "padding", "width", "height"]);
+  function pickFlowStyle(style) {
+    if (!style || typeof style !== "object") return void 0;
+    const out = {};
+    for (const [k, v] of Object.entries(style)) {
+      if (FLOW_STYLE_KEYS.has(k) && (typeof v === "string" || typeof v === "number")) {
+        out[k] = v;
+      }
+    }
+    return Object.keys(out).length > 0 ? out : void 0;
+  }
+  function truncateNote(note, max = 30) {
+    if (!note) return "";
+    return note.length <= max ? note : `${note.slice(0, max)}\u2026`;
+  }
+  function fmtPercent(value) {
+    if (value === void 0 || value === null || Number.isNaN(value)) return "\u2014";
+    return `${Math.round(value * 100)}%`;
+  }
+  function strengthColor(value) {
+    if (value === void 0 || value === null || Number.isNaN(value)) return "#9e9e9e";
+    return value >= 0.7 ? "#4caf50" : value >= 0.4 ? "#ff9800" : "#f44336";
+  }
+  function toArray(raw) {
+    if (Array.isArray(raw)) return raw;
+    return [];
+  }
+  function FlowView({ node, store, onEvent }) {
+    const props = node.props ?? {};
+    const [selectedId, setSelectedId] = (0, import_react.useState)(null);
+    const nodes = (0, import_react.useMemo)(() => {
+      const direct = toArray(props.nodes);
+      if (direct.length > 0) return direct;
+      const bound = store.get(node.dataBind ?? "datasource.items");
+      return toArray(bound);
+    }, [props.nodes, node.dataBind, store]);
+    const edges = (0, import_react.useMemo)(() => toArray(props.edges), [props.edges]);
+    const eliminated = (0, import_react.useMemo)(() => toArray(props.eliminated), [props.eliminated]);
+    const highlightOnClick = props.highlightOnClick === true;
+    const vertical = props.layout === "vertical";
+    const interactive = highlightOnClick || (node.events ?? []).some((e) => e.type === "click" || e.type === "onClick");
+    if (nodes.length === 0) {
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { color: "#999", fontSize: 12, padding: 6 }, children: "\uFF08\u65E0\u6EAF\u6E90\u8DEF\u5F84\u6570\u636E\uFF09" });
+    }
+    const relationOf = (source, target) => {
+      const edge = edges.find((e) => e.source === source && e.target === target);
+      return edge?.relation ?? "";
+    };
+    const handleNodeClick = (fn) => {
+      if (highlightOnClick) {
+        setSelectedId((prev) => prev === fn.id ? null : fn.id);
+      }
+      const clickEv = (node.events ?? []).find((e) => e.type === "click" || e.type === "onClick");
+      const relation = edges.find((e) => e.source === fn.id)?.relation ?? "";
+      const baseParams = {
+        nodeId: fn.id,
+        hop: fn.hop,
+        instanceId: fn.instanceId ?? "",
+        relation
+      };
+      if (clickEv) {
+        void onEvent({
+          ...clickEv,
+          params: { ...clickEv.params ?? {}, ...baseParams }
+        });
+      } else {
+        void onEvent({
+          type: "click",
+          handler: "showToast",
+          params: { message: truncateNote(fn.note) || fn.node, severity: "info" }
+        });
+      }
+    };
+    const nodeCardStyle = (fn) => {
+      const color = strengthColor(fn.evidenceStrength);
+      const selected = highlightOnClick && selectedId === fn.id;
+      return {
+        border: selected ? `3px solid ${color}` : `1px solid ${color}`,
+        borderRadius: 8,
+        cursor: interactive ? "pointer" : "default",
+        background: "#fff",
+        boxShadow: selected ? "0 4px 12px rgba(0,0,0,0.2)" : "0 1px 3px rgba(0,0,0,0.12)",
+        minWidth: 170,
+        maxWidth: 230,
+        padding: "8px 12px",
+        boxSizing: "border-box"
+      };
+    };
+    const chainStyle = vertical ? { display: "flex", flexDirection: "column", alignItems: "stretch", gap: 12 } : { display: "flex", flexDirection: "row", alignItems: "stretch", gap: 4, overflowX: "auto", padding: 4 };
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "cjdsl-flow", style: pickFlowStyle(node.style), "data-cjdsl-id": node.id, children: [
+      node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 15, fontWeight: 600, margin: "4px 0 8px" }, children: node.label }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: chainStyle, children: nodes.map((fn, i) => {
+        const next = i < nodes.length - 1 ? nodes[i + 1] : void 0;
+        const relation = next ? relationOf(fn.id, next.id) : "";
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", flexDirection: vertical ? "column" : "row", alignItems: "center", gap: 8, flex: "0 0 auto" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: nodeCardStyle(fn), onClick: () => handleNodeClick(fn), children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontWeight: 600, fontSize: 13, wordBreak: "break-all" }, children: fn.node }),
+              fn.type && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 10, color: "#1565c0", border: "1px solid #90caf9", borderRadius: 10, padding: "0 6px", lineHeight: "16px", whiteSpace: "nowrap" }, children: fn.type })
+            ] }),
+            truncateNote(fn.note) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 12, color: "#666", marginTop: 4, wordBreak: "break-word" }, children: truncateNote(fn.note) }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11 }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { style: { color: strengthColor(fn.evidenceStrength), fontWeight: 600 }, children: [
+                "\u8BC1\u636E ",
+                fmtPercent(fn.evidenceStrength)
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { style: { color: "#777" }, children: [
+                "\u7F6E\u4FE1 ",
+                fmtPercent(fn.pathConfidence)
+              ] })
+            ] })
+          ] }),
+          next && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", color: "#999", fontSize: 12, whiteSpace: "nowrap" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 16, lineHeight: 1 }, children: "\u2192" }),
+            relation && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#777", fontSize: 11 }, children: relation })
+          ] })
+        ] }, fn.id || `hop-${i}`);
+      }) }),
+      eliminated.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { marginTop: 12 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 13, fontWeight: 600, color: "#888", marginBottom: 4 }, children: "\u5DF2\u6392\u9664\u5019\u9009" }),
+        eliminated.map((item, i) => {
+          const linked = nodes.find((n) => String(n.node).toLowerCase() === String(item.candidate).toLowerCase());
+          return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+            "div",
+            {
+              style: { border: "1px dashed #bbb", background: "#fafafa", borderRadius: 8, padding: "6px 10px", marginBottom: 6 },
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#999", fontWeight: 600, fontSize: 13 }, children: item.candidate }),
+                  item.candidateType && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 10, color: "#888", border: "1px solid #ccc", borderRadius: 10, padding: "0 6px", lineHeight: "16px", whiteSpace: "nowrap" }, children: item.candidateType }),
+                  item.strength !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { style: { fontSize: 11, color: "#999" }, children: [
+                    "\u5F3A\u5EA6 ",
+                    fmtPercent(item.strength)
+                  ] })
+                ] }),
+                item.reason && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 12, color: "#aaa", marginTop: 2 }, children: item.reason }),
+                linked && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { fontSize: 11, color: "#999", marginTop: 2 }, children: [
+                  "\u865A\u7EBF\u5173\u8054\uFF1A",
+                  linked.node,
+                  "\uFF08hop-",
+                  linked.hop,
+                  "\uFF09"
+                ] })
+              ]
+            },
+            `${item.candidate}-${i}`
+          );
+        })
+      ] })
+    ] });
+  }
+
+  // ../CJDSL.React/src/dsl.ts
+  var V1_COMPONENT_TYPES = /* @__PURE__ */ new Set([
+    // 布局
+    "card",
+    "grid",
+    "stack",
+    "divider",
+    "form",
+    // 展示
+    "textDisplay",
+    "table",
+    "alert",
+    "chip",
+    "badge",
+    // 内联 DSL 引用（决策 7：渲染时 parseDslText → validateDsl → 递归子界面）
+    "dslRef",
+    // 表单
+    "text",
+    "number",
+    "select",
+    "textarea",
+    "date",
+    "switch",
+    // 交互
+    "button",
+    "iconButton",
+    // 图表
+    "chart",
+    // 溯源路径 flow
+    "flow"
+  ]);
+  var V1_EVENT_HANDLERS = /* @__PURE__ */ new Set([
+    "submit",
+    "apiCall",
+    "setValue",
+    "chain",
+    "showToast",
+    "navigate"
+  ]);
+  var V1_VALIDATION_RULES = /* @__PURE__ */ new Set([
+    "required",
+    "minLength",
+    "maxLength",
+    "regex",
+    "min",
+    "max"
+  ]);
+  var V1_DATA_SOURCE_TYPES = /* @__PURE__ */ new Set(["static", "api"]);
+  var FORBIDDEN_PROPS = /* @__PURE__ */ new Set([
+    "dangerouslySetInnerHTML",
+    "innerHTML",
+    "outerHTML",
+    "srcdoc",
+    "javascript"
+  ]);
+  var FORBIDDEN_EXPR_PATTERN = /(document|window|globalThis|process|require|import|fetch|eval|Function|constructor|prototype|__proto__|localStorage|sessionStorage)\b/i;
+  function isPlainObject(v) {
+    return typeof v === "object" && v !== null && !Array.isArray(v);
+  }
+  function validateComponent(node, path, errors, out) {
+    if (!isPlainObject(node)) {
+      errors.push(`${path}: \u7EC4\u4EF6\u5FC5\u987B\u662F\u5BF9\u8C61`);
+      return null;
+    }
+    const type = String(node.type ?? "");
+    if (!V1_COMPONENT_TYPES.has(type)) {
+      errors.push(`${path}: \u7EC4\u4EF6\u7C7B\u578B "${type || "(\u7A7A)"}" \u4E0D\u5728 v1 \u767D\u540D\u5355\uFF08\u5141\u8BB8: ${[...V1_COMPONENT_TYPES].join(", ")}\uFF09`);
+      return null;
+    }
+    if (node.props !== void 0) {
+      if (!isPlainObject(node.props)) {
+        errors.push(`${path}: props \u5FC5\u987B\u662F\u5BF9\u8C61`);
+        return null;
+      }
+      for (const key of Object.keys(node.props)) {
+        if (FORBIDDEN_PROPS.has(key)) {
+          errors.push(`${path}: props \u542B\u5371\u9669\u5C5E\u6027 "${key}"`);
+          return null;
+        }
+        const v = node.props[key];
+        if (typeof v === "string" && /^\s*javascript:/i.test(v)) {
+          errors.push(`${path}: props.${key} \u542B javascript: URL`);
+          return null;
+        }
+      }
+    }
+    for (const exprField of ["visibleIf", "disabledIf"]) {
+      const expr = node[exprField];
+      if (typeof expr === "string" && expr.trim() !== "" && FORBIDDEN_EXPR_PATTERN.test(expr)) {
+        errors.push(`${path}: ${exprField} \u8868\u8FBE\u5F0F\u542B\u975E\u6CD5\u5F15\u7528`);
+        return null;
+      }
+    }
+    if (node.events !== void 0) {
+      if (!Array.isArray(node.events)) {
+        errors.push(`${path}: events \u5FC5\u987B\u662F\u6570\u7EC4`);
+        return null;
+      }
+      for (let i = 0; i < node.events.length; i++) {
+        const ev = node.events[i];
+        if (!isPlainObject(ev)) {
+          errors.push(`${path}.events[${i}]: \u4E8B\u4EF6\u5FC5\u987B\u662F\u5BF9\u8C61`);
+          return null;
+        }
+        const handler = String(ev.handler ?? "");
+        if (!V1_EVENT_HANDLERS.has(handler)) {
+          errors.push(`${path}.events[${i}]: handler "${handler}" \u4E0D\u5728 v1 \u767D\u540D\u5355\uFF08\u5141\u8BB8: ${[...V1_EVENT_HANDLERS].join(", ")}\uFF09`);
+          return null;
+        }
+      }
+    }
+    if (node.validationRules !== void 0) {
+      if (!Array.isArray(node.validationRules)) {
+        errors.push(`${path}: validationRules \u5FC5\u987B\u662F\u6570\u7EC4`);
+        return null;
+      }
+      for (let i = 0; i < node.validationRules.length; i++) {
+        const rule = node.validationRules[i];
+        if (!isPlainObject(rule)) {
+          errors.push(`${path}.validationRules[${i}]: \u6821\u9A8C\u89C4\u5219\u5FC5\u987B\u662F\u5BF9\u8C61`);
+          return null;
+        }
+        const rt = String(rule.type ?? "");
+        if (!V1_VALIDATION_RULES.has(rt)) {
+          errors.push(`${path}.validationRules[${i}]: \u89C4\u5219\u7C7B\u578B "${rt}" \u4E0D\u5728 v1 \u767D\u540D\u5355\uFF08\u5141\u8BB8: ${[...V1_VALIDATION_RULES].join(", ")}\uFF09`);
+          return null;
+        }
+      }
+    }
+    if (node.dataSource !== void 0) {
+      if (!isPlainObject(node.dataSource)) {
+        errors.push(`${path}: dataSource \u5FC5\u987B\u662F\u5BF9\u8C61`);
+        return null;
+      }
+      const st = String(node.dataSource.type ?? "");
+      if (!V1_DATA_SOURCE_TYPES.has(st)) {
+        errors.push(`${path}: dataSource.type "${st}" \u4E0D\u5728 v1 \u767D\u540D\u5355\uFF08\u5141\u8BB8: static/api\uFF09`);
+        return null;
+      }
+      if (st === "api") {
+        const endpoint = String(node.dataSource.endpoint ?? "");
+        if (!/^https?:\/\//i.test(endpoint)) {
+          errors.push(`${path}: dataSource.endpoint \u5FC5\u987B\u662F http(s):// URL`);
+          return null;
+        }
+      }
+    }
+    if (type === "chart") {
+      const chartType = String(node.props?.ChartType ?? node.props?.chartType ?? "");
+      if (!["pie", "donut"].includes(chartType.toLowerCase())) {
+        errors.push(`${path}: chart \u4EC5\u652F\u6301 ChartType=Pie/Donut\uFF08v1 SVG \u76F4\u51FA\uFF09`);
+        return null;
+      }
+    }
+    const cleaned = { ...node };
+    if (node.children !== void 0) {
+      if (!Array.isArray(node.children)) {
+        errors.push(`${path}: children \u5FC5\u987B\u662F\u6570\u7EC4`);
+        return null;
+      }
+      const childrenOut = [];
+      for (let i = 0; i < node.children.length; i++) {
+        const child = validateComponent(node.children[i], `${path}.children[${i}]`, errors, null);
+        if (child) childrenOut.push(child);
+      }
+      cleaned.children = childrenOut;
+    }
+    return cleaned;
+  }
+  function validateDsl(input) {
+    const errors = [];
+    if (input == null) {
+      return { ok: false, errors: ["DSL \u4E3A\u7A7A"] };
+    }
+    if (Array.isArray(input)) {
+      const cleaned = [];
+      for (let i = 0; i < input.length; i++) {
+        const c = validateComponent(input[i], `components[${i}]`, errors, null);
+        if (c) cleaned.push(c);
+      }
+      if (errors.length > 0) return { ok: false, errors };
+      return { ok: true, errors, pages: cleaned };
+    }
+    if (isPlainObject(input)) {
+      if (Array.isArray(input.components)) {
+        const pages = [];
+        for (let i = 0; i < input.components.length; i++) {
+          const c2 = validateComponent(input.components[i], `page.components[${i}]`, errors, null);
+          if (c2) pages.push(c2);
+        }
+        if (errors.length > 0) return { ok: false, errors };
+        return { ok: true, errors, pages };
+      }
+      const c = validateComponent(input, "dsl", errors, null);
+      if (errors.length > 0 || !c) return { ok: false, errors };
+      return { ok: true, errors, cleaned: c };
+    }
+    return { ok: false, errors: ["DSL \u5FC5\u987B\u662F\u5BF9\u8C61\u6216\u6570\u7EC4"] };
+  }
+  function parseDslText(text) {
+    const trimmed = (text ?? "").trim();
+    if (!trimmed) return { ok: false, errors: ["dsl \u4E3A\u7A7A"] };
+    const fence = trimmed.match(/^```(?:dsl|json)?\s*\n([\s\S]*?)\n```$/);
+    const raw = fence ? fence[1].trim() : trimmed;
+    try {
+      const parsed = JSON.parse(raw);
+      return { ok: true, dsl: parsed, errors: [] };
+    } catch (e) {
+      return { ok: false, errors: [`DSL JSON \u89E3\u6790\u5931\u8D25: ${e.message}`] };
+    }
+  }
+
+  // ../CJDSL.React/src/DslRenderer.tsx
+  var import_jsx_runtime2 = __toESM(require_jsx_runtime(), 1);
   var STYLE_KEYS = /* @__PURE__ */ new Set(["class", "color", "backgroundColor", "margin", "padding", "width", "height"]);
   function pickStyle(style) {
     if (!style || typeof style !== "object") return void 0;
@@ -25025,14 +25392,14 @@ var CjdslWebComponent = (() => {
   }
   function DslRenderer(props) {
     const { root, store, callbacks } = props;
-    const [, setVersion] = (0, import_react.useState)(0);
-    const storeRef = (0, import_react.useRef)(store);
+    const [, setVersion] = (0, import_react2.useState)(0);
+    const storeRef = (0, import_react2.useRef)(store);
     storeRef.current = store;
-    (0, import_react.useEffect)(() => {
+    (0, import_react2.useEffect)(() => {
       const unsub = store.subscribe(() => setVersion((v) => v + 1));
       return unsub;
     }, [store]);
-    (0, import_react.useLayoutEffect)(() => {
+    (0, import_react2.useLayoutEffect)(() => {
       const walk = (n) => {
         const field = n.fieldName;
         if (field) {
@@ -25043,7 +25410,7 @@ var CjdslWebComponent = (() => {
       };
       walk(root);
     }, [root, store]);
-    const values = (0, import_react.useMemo)(() => {
+    const values = (0, import_react2.useMemo)(() => {
       const out = {};
       const walk = (n) => {
         if (n.fieldName) out[n.fieldName] = store.get(`data.${n.fieldName}`);
@@ -25052,9 +25419,9 @@ var CjdslWebComponent = (() => {
       walk(root);
       return out;
     }, [root, store]);
-    const dispatcher = (0, import_react.useMemo)(() => new EventDispatcher(), []);
-    const [validationErrors, setValidationErrors] = (0, import_react.useState)({});
-    const validateForm = (0, import_react.useCallback)(() => {
+    const dispatcher = (0, import_react2.useMemo)(() => new EventDispatcher(), []);
+    const [validationErrors, setValidationErrors] = (0, import_react2.useState)({});
+    const validateForm = (0, import_react2.useCallback)(() => {
       const errs = {};
       const walk = (n) => {
         if (n.fieldName && n.validationRules && n.validationRules.length > 0) {
@@ -25067,7 +25434,7 @@ var CjdslWebComponent = (() => {
       setValidationErrors(errs);
       return Object.keys(errs).length === 0;
     }, [root, store]);
-    const handleEvent = (0, import_react.useCallback)(
+    const handleEvent = (0, import_react2.useCallback)(
       async (ev) => {
         const formId = typeof root.id === "string" ? root.id : void 0;
         const ctxValues = {};
@@ -25097,14 +25464,14 @@ var CjdslWebComponent = (() => {
       },
       [root, dispatcher, validateForm, callbacks]
     );
-    const setField = (0, import_react.useCallback)(
+    const setField = (0, import_react2.useCallback)(
       (fieldName, value) => {
         store.set(`data.${fieldName}`, value);
         setValidationErrors((prev) => ({ ...prev, [fieldName]: [] }));
       },
       [store]
     );
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "cjdsl-root", style: pickStyle(root.style), "data-cjdsl-type": root.type, children: root.children && root.children.length > 0 ? root.children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "cjdsl-root", style: pickStyle(root.style), "data-cjdsl-type": root.type, children: root.children && root.children.length > 0 ? root.children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       DslNodeView,
       {
         node: child,
@@ -25115,7 +25482,7 @@ var CjdslWebComponent = (() => {
         onEvent: handleEvent
       },
       child.id || `n${i}`
-    )) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DslNodeView, { node: root, store, values, validationErrors, setField, onEvent: handleEvent }) });
+    )) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(DslNodeView, { node: root, store, values, validationErrors, setField, onEvent: handleEvent }) });
   }
   function DslNodeView({ node, store, values, validationErrors, setField, onEvent }) {
     const visible = evalDslExpr(node.visibleIf, store);
@@ -25126,40 +25493,71 @@ var CjdslWebComponent = (() => {
       case "stack":
       case "divider":
       case "form":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ContainerView, { node, store, values, validationErrors, setField, onEvent });
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ContainerView, { node, store, values, validationErrors, setField, onEvent });
       case "textDisplay":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextDisplayView, { node, store });
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(TextDisplayView, { node, store });
       case "table":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableView, { node, store });
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(TableView, { node, store });
       case "alert":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertView, { node });
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(AlertView, { node });
       case "chip":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChipView, { node });
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ChipView, { node });
       case "badge":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BadgeView, { node });
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(BadgeView, { node });
       case "text":
       case "number":
       case "select":
       case "textarea":
       case "date":
       case "switch":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           FieldView,
           {
             node,
             store,
             values,
             validationErrors,
-            setField
+            setField,
+            onEvent
           }
         );
       case "button":
       case "iconButton":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ButtonView, { node, store, onEvent });
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ButtonView, { node, store, onEvent });
       case "chart":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChartView, { node });
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ChartView, { node });
+      case "flow":
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(FlowView, { node, store, onEvent });
+      case "dslRef": {
+        const raw = String(node.props?.dsl ?? "");
+        const parsed = parseDslText(raw);
+        if (!parsed.ok || parsed.dsl == null) {
+          return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { color: "#c62828", fontSize: 12, padding: "6px 10px", border: "1px dashed #ef9a9a", borderRadius: 4 }, children: [
+            "dslRef \u89E3\u6790\u5931\u8D25\uFF1A",
+            escAttr((parsed.errors ?? []).join("\uFF1B"))
+          ] });
+        }
+        const verr = validateDsl(parsed.dsl);
+        if (!verr.ok) {
+          return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { color: "#c62828", fontSize: 12, padding: "6px 10px", border: "1px dashed #ef9a9a", borderRadius: 4 }, children: [
+            "dslRef \u6821\u9A8C\u672A\u901A\u8FC7\uFF1A",
+            escAttr((verr.errors ?? []).join("\uFF1B"))
+          ] });
+        }
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+          DslNodeView,
+          {
+            node: parsed.dsl,
+            store,
+            values,
+            validationErrors,
+            setField,
+            onEvent
+          }
+        );
+      }
       default:
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { color: "#c62828", fontSize: 12, padding: "6px 10px", border: "1px dashed #ef9a9a", borderRadius: 4 }, children: [
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { color: "#c62828", fontSize: 12, padding: "6px 10px", border: "1px dashed #ef9a9a", borderRadius: 4 }, children: [
           "\u672A\u652F\u6301\u7684\u7EC4\u4EF6\u7C7B\u578B\uFF1A",
           escAttr(node.type),
           "\uFF08DSL v1 \u767D\u540D\u5355\u5916\uFF09"
@@ -25169,12 +25567,12 @@ var CjdslWebComponent = (() => {
   function ContainerView(props) {
     const { node, store, values, validationErrors, setField, onEvent } = props;
     if (node.type === "divider") {
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("hr", { style: { border: "none", borderTop: "1px solid rgba(0,0,0,0.12)", margin: "8px 0" } });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("hr", { style: { border: "none", borderTop: "1px solid rgba(0,0,0,0.12)", margin: "8px 0" } });
     }
     const children = node.children ?? [];
-    const inner = children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DslNodeView, { node: child, store, values, validationErrors, setField, onEvent }, child.id || `c${i}`));
+    const inner = children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(DslNodeView, { node: child, store, values, validationErrors, setField, onEvent }, child.id || `c${i}`));
     const isForm = node.type === "form";
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
       "div",
       {
         className: `cjdsl-${node.type}`,
@@ -25190,8 +25588,8 @@ var CjdslWebComponent = (() => {
           ...node.style ? pickStyle(node.style) : {}
         },
         children: [
-          node.type === "grid" ? children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { width: `${Math.min(Math.max(child.span ?? 12, 1), 12) * (100 / 12)}%`, display: "inline-block", verticalAlign: "top", padding: "0 4px", boxSizing: "border-box" }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DslNodeView, { node: child, store, values, validationErrors, setField, onEvent }) }, child.id || `g${i}`)) : inner,
-          isForm && node.props?.showFooter !== false && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { marginTop: 10, textAlign: "right" }, children: node.props?.footerButtons?.map?.((btn, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DslNodeView, { node: { ...btn, type: "button" }, store, values, validationErrors, setField, onEvent }, btn.id || `fb${i}`)) })
+          node.type === "grid" ? children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { width: `${Math.min(Math.max(child.span ?? 12, 1), 12) * (100 / 12)}%`, display: "inline-block", verticalAlign: "top", padding: "0 4px", boxSizing: "border-box" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(DslNodeView, { node: child, store, values, validationErrors, setField, onEvent }) }, child.id || `g${i}`)) : inner,
+          isForm && node.props?.showFooter !== false && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { marginTop: 10, textAlign: "right" }, children: node.props?.footerButtons?.map?.((btn, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(DslNodeView, { node: { ...btn, type: "button" }, store, values, validationErrors, setField, onEvent }, btn.id || `fb${i}`)) })
         ]
       }
     );
@@ -25203,35 +25601,35 @@ var CjdslWebComponent = (() => {
     const typo = node.props?.typo ?? node.props?.Typo ?? "body1";
     const size = typo === "h1" ? 28 : typo === "h2" ? 24 : typo === "h3" ? 20 : typo === "h4" ? 17 : typo === "h5" ? 15 : typo === "h6" ? 13 : 14;
     const color = node.props?.color ?? node.props?.Color;
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: size, color: typeof color === "string" ? color : void 0, margin: "4px 0", whiteSpace: "pre-wrap", wordBreak: "break-word" }, children: String(text ?? "") });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { fontSize: size, color: typeof color === "string" ? color : void 0, margin: "4px 0", whiteSpace: "pre-wrap", wordBreak: "break-word" }, children: String(text ?? "") });
   }
   function TableView({ node, store }) {
     const columns = node.props?.columns ?? node.props?.Columns ?? [];
     const data = node.props?.items ?? node.props?.Items ?? node.props?.rows ?? node.props?.Rows ?? [];
     const finalData = data.length > 0 ? data : store.get(node.dataBind ?? "datasource.items") ?? [];
-    if (finalData.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { color: "#999", padding: 6 }, children: "\uFF08\u65E0\u6570\u636E\uFF09" });
+    if (finalData.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { color: "#999", padding: 6 }, children: "\uFF08\u65E0\u6570\u636E\uFF09" });
     const effectiveCols = columns.length > 0 ? columns : Object.keys(finalData[0] ?? {}).map((k) => ({ name: k, label: k }));
     const getValue = (row, col) => {
       const key = col.value ?? col.name ?? "";
       return row?.[key] ?? "";
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 13 }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tr", { children: effectiveCols.map((c, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { style: { borderBottom: "1px solid rgba(0,0,0,0.12)", padding: "6px 8px", textAlign: "left", fontWeight: 600 }, children: String(c.label ?? c.name ?? "") }, i)) }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: finalData.map((row, ri) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tr", { children: effectiveCols.map((c, ci) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { borderBottom: "1px solid rgba(0,0,0,0.06)", padding: "6px 8px" }, children: String(getValue(row, c) ?? "") }, ci)) }, ri)) })
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 13 }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("tr", { children: effectiveCols.map((c, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("th", { style: { borderBottom: "1px solid rgba(0,0,0,0.12)", padding: "6px 8px", textAlign: "left", fontWeight: 600 }, children: String(c.label ?? c.name ?? "") }, i)) }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("tbody", { children: finalData.map((row, ri) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("tr", { children: effectiveCols.map((c, ci) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("td", { style: { borderBottom: "1px solid rgba(0,0,0,0.06)", padding: "6px 8px" }, children: String(getValue(row, c) ?? "") }, ci)) }, ri)) })
     ] });
   }
   function AlertView({ node }) {
     const severity = node.props?.severity ?? node.props?.Severity ?? "info";
     const colorMap = { info: "#0277BD", success: "#2E7D32", warning: "#F57C00", error: "#C62828" };
     const bgMap = { info: "#E1F5FE", success: "#E8F5E9", warning: "#FFF3E0", error: "#FFEBEE" };
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { background: bgMap[severity] ?? bgMap.info, color: colorMap[severity] ?? colorMap.info, borderRadius: 6, padding: "8px 12px", fontSize: 13, margin: "6px 0" }, children: String(node.props?.text ?? node.props?.message ?? node.props?.content ?? node.label ?? "") });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { background: bgMap[severity] ?? bgMap.info, color: colorMap[severity] ?? colorMap.info, borderRadius: 6, padding: "8px 12px", fontSize: 13, margin: "6px 0" }, children: String(node.props?.text ?? node.props?.message ?? node.props?.content ?? node.label ?? "") });
   }
   function ChipView({ node }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { display: "inline-block", background: "rgba(0,0,0,0.08)", borderRadius: 12, padding: "2px 10px", fontSize: 12, margin: "2px 4px 2px 0" }, children: String(node.props?.text ?? node.props?.label ?? node.label ?? "") });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { display: "inline-block", background: "rgba(0,0,0,0.08)", borderRadius: 12, padding: "2px 10px", fontSize: 12, margin: "2px 4px 2px 0" }, children: String(node.props?.text ?? node.props?.label ?? node.label ?? "") });
   }
   function BadgeView({ node }) {
     const color = node.props?.color ?? node.props?.Color ?? "#1976D2";
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { display: "inline-block", background: String(color), color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 11, margin: "0 4px 0 0" }, children: String(node.props?.text ?? node.props?.content ?? node.label ?? "") });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { display: "inline-block", background: String(color), color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 11, margin: "0 4px 0 0" }, children: String(node.props?.text ?? node.props?.content ?? node.label ?? "") });
   }
   function FieldView({ node, store, values, validationErrors, setField }) {
     const field = node.fieldName;
@@ -25262,17 +25660,17 @@ var CjdslWebComponent = (() => {
     const helpStyle = { fontSize: 12, color: "#888" };
     const errorStyle = { fontSize: 12, color: "#C62828" };
     if (!field) {
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { color: "#c62828", fontSize: 12 }, children: "\u8868\u5355\u7EC4\u4EF6\u7F3A\u5C11 fieldName" });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { color: "#c62828", fontSize: 12 }, children: "\u8868\u5355\u7EC4\u4EF6\u7F3A\u5C11 fieldName" });
     }
     switch (node.type) {
       case "text":
       case "number":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-          node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+          node.label && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
             node.label,
-            required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+            required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
             "input",
             {
               type: node.type === "number" ? "number" : "text",
@@ -25283,16 +25681,16 @@ var CjdslWebComponent = (() => {
               onChange: (e) => setField(field, node.type === "number" ? Number(e.target.value) : e.target.value)
             }
           ),
-          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
         ] });
       case "textarea":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-          node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+          node.label && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
             node.label,
-            required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+            required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
             "textarea",
             {
               value: String(value ?? ""),
@@ -25303,36 +25701,36 @@ var CjdslWebComponent = (() => {
               onChange: (e) => setField(field, e.target.value)
             }
           ),
-          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
         ] });
       case "select":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-          node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+          node.label && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
             node.label,
-            required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+            required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { value: String(value ?? ""), disabled: disabledBase || submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value), children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "\u8BF7\u9009\u62E9" }),
-            itemsOf(node).map((it, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: it.value, disabled: it.disabled, children: it.label }, i))
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { value: String(value ?? ""), disabled: disabledBase || submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value), children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "", children: "\u8BF7\u9009\u62E9" }),
+            itemsOf(node).map((it, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: it.value, disabled: it.disabled, children: it.label }, i))
           ] }),
-          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
         ] });
       case "date":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-          node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+          node.label && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
             node.label,
-            required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+            required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "date", value: String(value ?? ""), disabled: disabledBase, readOnly: submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value) }),
-          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "date", value: String(value ?? ""), disabled: disabledBase, readOnly: submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value) }),
+          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
         ] });
       case "switch":
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase || submitted ? "not-allowed" : "pointer" }, "data-kb-field": node.fieldName, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase || submitted ? "not-allowed" : "pointer" }, "data-kb-field": node.fieldName, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "input",
               {
                 type: "checkbox",
@@ -25342,10 +25740,10 @@ var CjdslWebComponent = (() => {
               }
             ),
             node.label,
-            required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+            required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
           ] }),
-          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+          errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+          node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
         ] });
       default:
         return null;
@@ -25370,17 +25768,17 @@ var CjdslWebComponent = (() => {
     const href = node.props?.href;
     const common = { style, disabled, "data-cjdsl-id": node.id };
     if (href && isSafeLink(href)) {
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: String(href), ...common, children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : label });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { href: String(href), ...common, children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : label });
     }
     if (clickEv) {
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { ...common, onClick: () => void onEvent(clickEv), children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : label });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { ...common, onClick: () => void onEvent(clickEv), children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : label });
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { ...common, onClick: () => void onEvent({ type: "click", handler: "showToast", params: { message: "\u6309\u94AE\u672A\u914D\u7F6E\u4E8B\u4EF6", severity: "warning" } }), children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : label });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { ...common, onClick: () => void onEvent({ type: "click", handler: "showToast", params: { message: "\u6309\u94AE\u672A\u914D\u7F6E\u4E8B\u4EF6", severity: "warning" } }), children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : label });
   }
   function ChartView({ node }) {
     const chartType = node.props?.ChartType ?? node.props?.chartType ?? "donut";
     if (chartType !== "pie" && chartType !== "donut") {
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { color: "#888", fontSize: 12, padding: 6 }, children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { color: "#888", fontSize: 12, padding: 6 }, children: [
         "chart v1 \u4EC5\u652F\u6301 Pie/Donut\uFF08\u5F53\u524D ",
         String(chartType),
         "\uFF09"
@@ -25411,7 +25809,7 @@ var CjdslWebComponent = (() => {
       svgLen: svg.length,
       svgHead: svg.slice(0, 120)
     });
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { display: "flex", justifyContent: "center", margin: "10px 0" }, dangerouslySetInnerHTML: { __html: svg } });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { display: "flex", justifyContent: "center", margin: "10px 0" }, dangerouslySetInnerHTML: { __html: svg } });
   }
 
   // ../CJDSL.React/src/store.ts
@@ -25579,12 +25977,12 @@ var CjdslWebComponent = (() => {
   var defaultApiClient = new HttpCjdslApiClient();
 
   // ../CJDSL.React/src/ChatDslNode.tsx
-  var import_react2 = __toESM(require_react(), 1);
-  var import_jsx_runtime2 = __toESM(require_jsx_runtime(), 1);
-
-  // ../CJDSL.React/src/ToolCard.tsx
   var import_react3 = __toESM(require_react(), 1);
   var import_jsx_runtime3 = __toESM(require_jsx_runtime(), 1);
+
+  // ../CJDSL.React/src/ToolCard.tsx
+  var import_react4 = __toESM(require_react(), 1);
+  var import_jsx_runtime4 = __toESM(require_jsx_runtime(), 1);
 
   // src/styles.ts
   var BASE_STYLE = `
@@ -25939,9 +26337,9 @@ var CjdslWebComponent = (() => {
   };
 
   // src/render-mount.ts
-  var import_react4 = __toESM(require_react(), 1);
+  var import_react5 = __toESM(require_react(), 1);
   function createEmptyPlaceholder(reason = "empty", onCommit) {
-    const placeholder = import_react4.default.createElement(
+    const placeholder = import_react5.default.createElement(
       "div",
       {
         style: reason === "invalid" ? {
@@ -25956,14 +26354,14 @@ var CjdslWebComponent = (() => {
       reason === "invalid" ? "DSL \u89E3\u6790\u5931\u8D25\u6216\u6E32\u67D3\u5F02\u5E38\uFF0C\u70B9\u51FB\u53F3\u4E0A\u89D2\u6309\u94AE\u67E5\u770B\u6E90\u7801\u6392\u67E5" : "\uFF08\u65E0 DSL \u5185\u5BB9\uFF09"
     );
     if (!onCommit) return placeholder;
-    return import_react4.default.createElement(
-      import_react4.default.Fragment,
+    return import_react5.default.createElement(
+      import_react5.default.Fragment,
       null,
-      import_react4.default.createElement(CommitSuccessNotifier, { onCommit }),
+      import_react5.default.createElement(CommitSuccessNotifier, { onCommit }),
       placeholder
     );
   }
-  var DslRenderErrorBoundary = class extends import_react4.default.Component {
+  var DslRenderErrorBoundary = class extends import_react5.default.Component {
     constructor(props) {
       super(props);
       this.state = { failed: false };
@@ -25980,18 +26378,18 @@ var CjdslWebComponent = (() => {
     }
   };
   function createDslRendererElement(root, store, callbacks) {
-    return import_react4.default.createElement(DslRenderer, { root, store, callbacks });
+    return import_react5.default.createElement(DslRenderer, { root, store, callbacks });
   }
   function createErrorBoundedRendererElement(root, store, callbacks, onError, onCommit) {
-    return import_react4.default.createElement(
+    return import_react5.default.createElement(
       DslRenderErrorBoundary,
       { onError },
-      import_react4.default.createElement(CommitSuccessNotifier, { onCommit }),
+      import_react5.default.createElement(CommitSuccessNotifier, { onCommit }),
       createDslRendererElement(root, store, callbacks)
     );
   }
   function CommitSuccessNotifier({ onCommit }) {
-    (0, import_react4.useEffect)(() => {
+    (0, import_react5.useEffect)(() => {
       onCommit();
     }, [onCommit]);
     return null;

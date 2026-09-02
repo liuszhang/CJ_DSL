@@ -27,7 +27,7 @@ __export(client_entry_exports, {
 module.exports = __toCommonJS(client_entry_exports);
 
 // src/DslRenderer.tsx
-var import_react = require("react");
+var import_react2 = require("react");
 
 // src/expr.ts
 function tokenize(input) {
@@ -453,7 +453,20 @@ var COLORS = [
 ];
 function buildDonutSvg(data, width = 300, height = 300, isDonut = true) {
   const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
+  console.info("[cjdsl-page][buildDonutSvg]", {
+    dataLen: data.length,
+    total,
+    width,
+    height,
+    isDonut,
+    firstItem: data[0]
+  });
   if (total <= 0) {
+    console.warn("[cjdsl-page][buildDonutSvg] total<=0\uFF0C\u8FD4\u56DE\u300C\u6240\u6709\u503C\u4E3A\u96F6\u300D\u5360\u4F4D\uFF08\u7070\u6846\u5143\u51F6\uFF1F\uFF09", {
+      dataLen: data.length,
+      firstItem: data[0],
+      rawValues: data.slice(0, 5).map((d) => d.value)
+    });
     return `<div style="color:#999;padding:20px;text-align:center;">\u6240\u6709\u503C\u4E3A\u96F6</div>`;
   }
   const cx = width / 2;
@@ -466,7 +479,6 @@ function buildDonutSvg(data, width = 300, height = 300, isDonut = true) {
     const v = Number(data[i].value) || 0;
     const sweep = v / total * 360;
     const end = start + sweep;
-    path += arcPath(cx, cy, outerR, innerR, start, end);
     const color = COLORS[i % COLORS.length];
     const label = data[i].label || `\u9879\u76EE${i + 1}`;
     const pct = Math.round(v / total * 1e3) / 10;
@@ -498,9 +510,168 @@ function arcPath(cx, cy, outerR, innerR, startDeg, endDeg) {
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
+if (typeof console !== "undefined" && !globalThis.__cjdsl_svg_loaded__) {
+  globalThis.__cjdsl_svg_loaded__ = true;
+  console.info("[cjdsl-page] buildDonutSvg v2 loaded (no raw-path-text bug)");
+}
+
+// src/flow.tsx
+var import_react = require("react");
+var import_jsx_runtime = require("react/jsx-runtime");
+var FLOW_STYLE_KEYS = /* @__PURE__ */ new Set(["class", "color", "backgroundColor", "margin", "padding", "width", "height"]);
+function pickFlowStyle(style) {
+  if (!style || typeof style !== "object") return void 0;
+  const out = {};
+  for (const [k, v] of Object.entries(style)) {
+    if (FLOW_STYLE_KEYS.has(k) && (typeof v === "string" || typeof v === "number")) {
+      out[k] = v;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : void 0;
+}
+function truncateNote(note, max = 30) {
+  if (!note) return "";
+  return note.length <= max ? note : `${note.slice(0, max)}\u2026`;
+}
+function fmtPercent(value) {
+  if (value === void 0 || value === null || Number.isNaN(value)) return "\u2014";
+  return `${Math.round(value * 100)}%`;
+}
+function strengthColor(value) {
+  if (value === void 0 || value === null || Number.isNaN(value)) return "#9e9e9e";
+  return value >= 0.7 ? "#4caf50" : value >= 0.4 ? "#ff9800" : "#f44336";
+}
+function toArray(raw) {
+  if (Array.isArray(raw)) return raw;
+  return [];
+}
+function FlowView({ node, store, onEvent }) {
+  const props = node.props ?? {};
+  const [selectedId, setSelectedId] = (0, import_react.useState)(null);
+  const nodes = (0, import_react.useMemo)(() => {
+    const direct = toArray(props.nodes);
+    if (direct.length > 0) return direct;
+    const bound = store.get(node.dataBind ?? "datasource.items");
+    return toArray(bound);
+  }, [props.nodes, node.dataBind, store]);
+  const edges = (0, import_react.useMemo)(() => toArray(props.edges), [props.edges]);
+  const eliminated = (0, import_react.useMemo)(() => toArray(props.eliminated), [props.eliminated]);
+  const highlightOnClick = props.highlightOnClick === true;
+  const vertical = props.layout === "vertical";
+  const interactive = highlightOnClick || (node.events ?? []).some((e) => e.type === "click" || e.type === "onClick");
+  if (nodes.length === 0) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { color: "#999", fontSize: 12, padding: 6 }, children: "\uFF08\u65E0\u6EAF\u6E90\u8DEF\u5F84\u6570\u636E\uFF09" });
+  }
+  const relationOf = (source, target) => {
+    const edge = edges.find((e) => e.source === source && e.target === target);
+    return edge?.relation ?? "";
+  };
+  const handleNodeClick = (fn) => {
+    if (highlightOnClick) {
+      setSelectedId((prev) => prev === fn.id ? null : fn.id);
+    }
+    const clickEv = (node.events ?? []).find((e) => e.type === "click" || e.type === "onClick");
+    const relation = edges.find((e) => e.source === fn.id)?.relation ?? "";
+    const baseParams = {
+      nodeId: fn.id,
+      hop: fn.hop,
+      instanceId: fn.instanceId ?? "",
+      relation
+    };
+    if (clickEv) {
+      void onEvent({
+        ...clickEv,
+        params: { ...clickEv.params ?? {}, ...baseParams }
+      });
+    } else {
+      void onEvent({
+        type: "click",
+        handler: "showToast",
+        params: { message: truncateNote(fn.note) || fn.node, severity: "info" }
+      });
+    }
+  };
+  const nodeCardStyle = (fn) => {
+    const color = strengthColor(fn.evidenceStrength);
+    const selected = highlightOnClick && selectedId === fn.id;
+    return {
+      border: selected ? `3px solid ${color}` : `1px solid ${color}`,
+      borderRadius: 8,
+      cursor: interactive ? "pointer" : "default",
+      background: "#fff",
+      boxShadow: selected ? "0 4px 12px rgba(0,0,0,0.2)" : "0 1px 3px rgba(0,0,0,0.12)",
+      minWidth: 170,
+      maxWidth: 230,
+      padding: "8px 12px",
+      boxSizing: "border-box"
+    };
+  };
+  const chainStyle = vertical ? { display: "flex", flexDirection: "column", alignItems: "stretch", gap: 12 } : { display: "flex", flexDirection: "row", alignItems: "stretch", gap: 4, overflowX: "auto", padding: 4 };
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "cjdsl-flow", style: pickFlowStyle(node.style), "data-cjdsl-id": node.id, children: [
+    node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 15, fontWeight: 600, margin: "4px 0 8px" }, children: node.label }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: chainStyle, children: nodes.map((fn, i) => {
+      const next = i < nodes.length - 1 ? nodes[i + 1] : void 0;
+      const relation = next ? relationOf(fn.id, next.id) : "";
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", flexDirection: vertical ? "column" : "row", alignItems: "center", gap: 8, flex: "0 0 auto" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: nodeCardStyle(fn), onClick: () => handleNodeClick(fn), children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontWeight: 600, fontSize: 13, wordBreak: "break-all" }, children: fn.node }),
+            fn.type && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 10, color: "#1565c0", border: "1px solid #90caf9", borderRadius: 10, padding: "0 6px", lineHeight: "16px", whiteSpace: "nowrap" }, children: fn.type })
+          ] }),
+          truncateNote(fn.note) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 12, color: "#666", marginTop: 4, wordBreak: "break-word" }, children: truncateNote(fn.note) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11 }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { style: { color: strengthColor(fn.evidenceStrength), fontWeight: 600 }, children: [
+              "\u8BC1\u636E ",
+              fmtPercent(fn.evidenceStrength)
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { style: { color: "#777" }, children: [
+              "\u7F6E\u4FE1 ",
+              fmtPercent(fn.pathConfidence)
+            ] })
+          ] })
+        ] }),
+        next && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", color: "#999", fontSize: 12, whiteSpace: "nowrap" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 16, lineHeight: 1 }, children: "\u2192" }),
+          relation && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#777", fontSize: 11 }, children: relation })
+        ] })
+      ] }, fn.id || `hop-${i}`);
+    }) }),
+    eliminated.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { marginTop: 12 }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 13, fontWeight: 600, color: "#888", marginBottom: 4 }, children: "\u5DF2\u6392\u9664\u5019\u9009" }),
+      eliminated.map((item, i) => {
+        const linked = nodes.find((n) => String(n.node).toLowerCase() === String(item.candidate).toLowerCase());
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+          "div",
+          {
+            style: { border: "1px dashed #bbb", background: "#fafafa", borderRadius: 8, padding: "6px 10px", marginBottom: 6 },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#999", fontWeight: 600, fontSize: 13 }, children: item.candidate }),
+                item.candidateType && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 10, color: "#888", border: "1px solid #ccc", borderRadius: 10, padding: "0 6px", lineHeight: "16px", whiteSpace: "nowrap" }, children: item.candidateType }),
+                item.strength !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { style: { fontSize: 11, color: "#999" }, children: [
+                  "\u5F3A\u5EA6 ",
+                  fmtPercent(item.strength)
+                ] })
+              ] }),
+              item.reason && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 12, color: "#aaa", marginTop: 2 }, children: item.reason }),
+              linked && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { fontSize: 11, color: "#999", marginTop: 2 }, children: [
+                "\u865A\u7EBF\u5173\u8054\uFF1A",
+                linked.node,
+                "\uFF08hop-",
+                linked.hop,
+                "\uFF09"
+              ] })
+            ]
+          },
+          `${item.candidate}-${i}`
+        );
+      })
+    ] })
+  ] });
+}
 
 // src/DslRenderer.tsx
-var import_jsx_runtime = require("react/jsx-runtime");
+var import_jsx_runtime2 = require("react/jsx-runtime");
 var STYLE_KEYS = /* @__PURE__ */ new Set(["class", "color", "backgroundColor", "margin", "padding", "width", "height"]);
 function pickStyle(style) {
   if (!style || typeof style !== "object") return void 0;
@@ -532,14 +703,25 @@ function isSafeLink(href) {
 }
 function DslRenderer(props) {
   const { root, store, callbacks } = props;
-  const [, setVersion] = (0, import_react.useState)(0);
-  const storeRef = (0, import_react.useRef)(store);
+  const [, setVersion] = (0, import_react2.useState)(0);
+  const storeRef = (0, import_react2.useRef)(store);
   storeRef.current = store;
-  (0, import_react.useEffect)(() => {
+  (0, import_react2.useEffect)(() => {
     const unsub = store.subscribe(() => setVersion((v) => v + 1));
     return unsub;
   }, [store]);
-  const values = (0, import_react.useMemo)(() => {
+  (0, import_react2.useLayoutEffect)(() => {
+    const walk = (n) => {
+      const field = n.fieldName;
+      if (field) {
+        const v = n.props?.value ?? n.props?.Value;
+        if (v !== void 0 && v !== null) store.set(`data.${field}`, v);
+      }
+      if (n.children) n.children.forEach(walk);
+    };
+    walk(root);
+  }, [root, store]);
+  const values = (0, import_react2.useMemo)(() => {
     const out = {};
     const walk = (n) => {
       if (n.fieldName) out[n.fieldName] = store.get(`data.${n.fieldName}`);
@@ -548,9 +730,9 @@ function DslRenderer(props) {
     walk(root);
     return out;
   }, [root, store]);
-  const dispatcher = (0, import_react.useMemo)(() => new EventDispatcher(), []);
-  const [validationErrors, setValidationErrors] = (0, import_react.useState)({});
-  const validateForm = (0, import_react.useCallback)(() => {
+  const dispatcher = (0, import_react2.useMemo)(() => new EventDispatcher(), []);
+  const [validationErrors, setValidationErrors] = (0, import_react2.useState)({});
+  const validateForm = (0, import_react2.useCallback)(() => {
     const errs = {};
     const walk = (n) => {
       if (n.fieldName && n.validationRules && n.validationRules.length > 0) {
@@ -563,7 +745,7 @@ function DslRenderer(props) {
     setValidationErrors(errs);
     return Object.keys(errs).length === 0;
   }, [root, store]);
-  const handleEvent = (0, import_react.useCallback)(
+  const handleEvent = (0, import_react2.useCallback)(
     async (ev) => {
       const formId = typeof root.id === "string" ? root.id : void 0;
       const ctxValues = {};
@@ -593,14 +775,14 @@ function DslRenderer(props) {
     },
     [root, dispatcher, validateForm, callbacks]
   );
-  const setField = (0, import_react.useCallback)(
+  const setField = (0, import_react2.useCallback)(
     (fieldName, value) => {
       store.set(`data.${fieldName}`, value);
       setValidationErrors((prev) => ({ ...prev, [fieldName]: [] }));
     },
     [store]
   );
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "cjdsl-root", style: pickStyle(root.style), "data-cjdsl-type": root.type, children: root.children && root.children.length > 0 ? root.children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "cjdsl-root", style: pickStyle(root.style), "data-cjdsl-type": root.type, children: root.children && root.children.length > 0 ? root.children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
     DslNodeView,
     {
       node: child,
@@ -611,7 +793,7 @@ function DslRenderer(props) {
       onEvent: handleEvent
     },
     child.id || `n${i}`
-  )) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DslNodeView, { node: root, store, values, validationErrors, setField, onEvent: handleEvent }) });
+  )) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(DslNodeView, { node: root, store, values, validationErrors, setField, onEvent: handleEvent }) });
 }
 function DslNodeView({ node, store, values, validationErrors, setField, onEvent }) {
   const visible = evalDslExpr(node.visibleIf, store);
@@ -622,40 +804,43 @@ function DslNodeView({ node, store, values, validationErrors, setField, onEvent 
     case "stack":
     case "divider":
     case "form":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ContainerView, { node, store, values, validationErrors, setField, onEvent });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ContainerView, { node, store, values, validationErrors, setField, onEvent });
     case "textDisplay":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextDisplayView, { node, store });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(TextDisplayView, { node, store });
     case "table":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableView, { node, store });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(TableView, { node, store });
     case "alert":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertView, { node });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(AlertView, { node });
     case "chip":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChipView, { node });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ChipView, { node });
     case "badge":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BadgeView, { node });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(BadgeView, { node });
     case "text":
     case "number":
     case "select":
     case "textarea":
     case "date":
     case "switch":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
         FieldView,
         {
           node,
           store,
           values,
           validationErrors,
-          setField
+          setField,
+          onEvent
         }
       );
     case "button":
     case "iconButton":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ButtonView, { node, store, onEvent });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ButtonView, { node, store, onEvent });
     case "chart":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChartView, { node });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ChartView, { node });
+    case "flow":
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(FlowView, { node, store, onEvent });
     default:
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { color: "#c62828", fontSize: 12, padding: "6px 10px", border: "1px dashed #ef9a9a", borderRadius: 4 }, children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { color: "#c62828", fontSize: 12, padding: "6px 10px", border: "1px dashed #ef9a9a", borderRadius: 4 }, children: [
         "\u672A\u652F\u6301\u7684\u7EC4\u4EF6\u7C7B\u578B\uFF1A",
         escAttr(node.type),
         "\uFF08DSL v1 \u767D\u540D\u5355\u5916\uFF09"
@@ -665,12 +850,12 @@ function DslNodeView({ node, store, values, validationErrors, setField, onEvent 
 function ContainerView(props) {
   const { node, store, values, validationErrors, setField, onEvent } = props;
   if (node.type === "divider") {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("hr", { style: { border: "none", borderTop: "1px solid rgba(0,0,0,0.12)", margin: "8px 0" } });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("hr", { style: { border: "none", borderTop: "1px solid rgba(0,0,0,0.12)", margin: "8px 0" } });
   }
   const children = node.children ?? [];
-  const inner = children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DslNodeView, { node: child, store, values, validationErrors, setField, onEvent }, child.id || `c${i}`));
+  const inner = children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(DslNodeView, { node: child, store, values, validationErrors, setField, onEvent }, child.id || `c${i}`));
   const isForm = node.type === "form";
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
     "div",
     {
       className: `cjdsl-${node.type}`,
@@ -686,8 +871,8 @@ function ContainerView(props) {
         ...node.style ? pickStyle(node.style) : {}
       },
       children: [
-        node.type === "grid" ? children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { width: `${Math.min(Math.max(child.span ?? 12, 1), 12) * (100 / 12)}%`, display: "inline-block", verticalAlign: "top", padding: "0 4px", boxSizing: "border-box" }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DslNodeView, { node: child, store, values, validationErrors, setField, onEvent }) }, child.id || `g${i}`)) : inner,
-        isForm && node.props?.showFooter !== false && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { marginTop: 10, textAlign: "right" }, children: node.props?.footerButtons?.map?.((btn, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DslNodeView, { node: { ...btn, type: "button" }, store, values, validationErrors, setField, onEvent }, btn.id || `fb${i}`)) })
+        node.type === "grid" ? children.map((child, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { width: `${Math.min(Math.max(child.span ?? 12, 1), 12) * (100 / 12)}%`, display: "inline-block", verticalAlign: "top", padding: "0 4px", boxSizing: "border-box" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(DslNodeView, { node: child, store, values, validationErrors, setField, onEvent }) }, child.id || `g${i}`)) : inner,
+        isForm && node.props?.showFooter !== false && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { marginTop: 10, textAlign: "right" }, children: node.props?.footerButtons?.map?.((btn, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(DslNodeView, { node: { ...btn, type: "button" }, store, values, validationErrors, setField, onEvent }, btn.id || `fb${i}`)) })
       ]
     }
   );
@@ -699,41 +884,42 @@ function TextDisplayView({ node, store }) {
   const typo = node.props?.typo ?? node.props?.Typo ?? "body1";
   const size = typo === "h1" ? 28 : typo === "h2" ? 24 : typo === "h3" ? 20 : typo === "h4" ? 17 : typo === "h5" ? 15 : typo === "h6" ? 13 : 14;
   const color = node.props?.color ?? node.props?.Color;
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: size, color: typeof color === "string" ? color : void 0, margin: "4px 0", whiteSpace: "pre-wrap", wordBreak: "break-word" }, children: String(text ?? "") });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { fontSize: size, color: typeof color === "string" ? color : void 0, margin: "4px 0", whiteSpace: "pre-wrap", wordBreak: "break-word" }, children: String(text ?? "") });
 }
 function TableView({ node, store }) {
   const columns = node.props?.columns ?? node.props?.Columns ?? [];
   const data = node.props?.items ?? node.props?.Items ?? node.props?.rows ?? node.props?.Rows ?? [];
   const finalData = data.length > 0 ? data : store.get(node.dataBind ?? "datasource.items") ?? [];
-  if (finalData.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { color: "#999", padding: 6 }, children: "\uFF08\u65E0\u6570\u636E\uFF09" });
+  if (finalData.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { color: "#999", padding: 6 }, children: "\uFF08\u65E0\u6570\u636E\uFF09" });
   const effectiveCols = columns.length > 0 ? columns : Object.keys(finalData[0] ?? {}).map((k) => ({ name: k, label: k }));
   const getValue = (row, col) => {
     const key = col.value ?? col.name ?? "";
     return row?.[key] ?? "";
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 13 }, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tr", { children: effectiveCols.map((c, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { style: { borderBottom: "1px solid rgba(0,0,0,0.12)", padding: "6px 8px", textAlign: "left", fontWeight: 600 }, children: String(c.label ?? c.name ?? "") }, i)) }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: finalData.map((row, ri) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tr", { children: effectiveCols.map((c, ci) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { borderBottom: "1px solid rgba(0,0,0,0.06)", padding: "6px 8px" }, children: String(getValue(row, c) ?? "") }, ci)) }, ri)) })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 13 }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("tr", { children: effectiveCols.map((c, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("th", { style: { borderBottom: "1px solid rgba(0,0,0,0.12)", padding: "6px 8px", textAlign: "left", fontWeight: 600 }, children: String(c.label ?? c.name ?? "") }, i)) }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("tbody", { children: finalData.map((row, ri) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("tr", { children: effectiveCols.map((c, ci) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("td", { style: { borderBottom: "1px solid rgba(0,0,0,0.06)", padding: "6px 8px" }, children: String(getValue(row, c) ?? "") }, ci)) }, ri)) })
   ] });
 }
 function AlertView({ node }) {
   const severity = node.props?.severity ?? node.props?.Severity ?? "info";
   const colorMap = { info: "#0277BD", success: "#2E7D32", warning: "#F57C00", error: "#C62828" };
   const bgMap = { info: "#E1F5FE", success: "#E8F5E9", warning: "#FFF3E0", error: "#FFEBEE" };
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { background: bgMap[severity] ?? bgMap.info, color: colorMap[severity] ?? colorMap.info, borderRadius: 6, padding: "8px 12px", fontSize: 13, margin: "6px 0" }, children: String(node.props?.text ?? node.props?.message ?? node.props?.content ?? node.label ?? "") });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { background: bgMap[severity] ?? bgMap.info, color: colorMap[severity] ?? colorMap.info, borderRadius: 6, padding: "8px 12px", fontSize: 13, margin: "6px 0" }, children: String(node.props?.text ?? node.props?.message ?? node.props?.content ?? node.label ?? "") });
 }
 function ChipView({ node }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { display: "inline-block", background: "rgba(0,0,0,0.08)", borderRadius: 12, padding: "2px 10px", fontSize: 12, margin: "2px 4px 2px 0" }, children: String(node.props?.text ?? node.props?.label ?? node.label ?? "") });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { display: "inline-block", background: "rgba(0,0,0,0.08)", borderRadius: 12, padding: "2px 10px", fontSize: 12, margin: "2px 4px 2px 0" }, children: String(node.props?.text ?? node.props?.label ?? node.label ?? "") });
 }
 function BadgeView({ node }) {
   const color = node.props?.color ?? node.props?.Color ?? "#1976D2";
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { display: "inline-block", background: String(color), color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 11, margin: "0 4px 0 0" }, children: String(node.props?.text ?? node.props?.content ?? node.label ?? "") });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { display: "inline-block", background: String(color), color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 11, margin: "0 4px 0 0" }, children: String(node.props?.text ?? node.props?.content ?? node.label ?? "") });
 }
 function FieldView({ node, store, values, validationErrors, setField }) {
   const field = node.fieldName;
   const value = field ? store.get(`data.${field}`) ?? "" : "";
   const required = node.props?.Required === true || node.props?.required === true;
   const disabledBase = evalDslExpr(node.disabledIf, store) === true;
+  const submitted = store.get("__cjdsl_submitted") === true;
   const errors = field ? validationErrors[field] ?? [] : [];
   const baseStyle = {
     display: "flex",
@@ -742,108 +928,114 @@ function FieldView({ node, store, values, validationErrors, setField }) {
     margin: "6px 0"
   };
   const labelStyle = { fontSize: 13, color: "rgba(0,0,0,0.66)", fontWeight: 500 };
+  const lockBg = disabledBase || submitted ? "#f5f5f5" : "#fff";
+  const lockColor = disabledBase || submitted ? "#9e9e9e" : "inherit";
   const inputStyle = {
     border: errors.length > 0 ? "1px solid #C62828" : "1px solid rgba(0,0,0,0.22)",
     borderRadius: 4,
     padding: "6px 10px",
     fontSize: 14,
     outline: "none",
-    background: disabledBase ? "#f5f5f5" : "#fff",
-    color: disabledBase ? "#9e9e9e" : "inherit",
+    background: lockBg,
+    color: lockColor,
     fontFamily: "inherit"
   };
   const helpStyle = { fontSize: 12, color: "#888" };
   const errorStyle = { fontSize: 12, color: "#C62828" };
   if (!field) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { color: "#c62828", fontSize: 12 }, children: "\u8868\u5355\u7EC4\u4EF6\u7F3A\u5C11 fieldName" });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { color: "#c62828", fontSize: 12 }, children: "\u8868\u5355\u7EC4\u4EF6\u7F3A\u5C11 fieldName" });
   }
   switch (node.type) {
     case "text":
     case "number":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-        node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: labelStyle, children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+        node.label && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
           node.label,
-          required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+          required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           "input",
           {
             type: node.type === "number" ? "number" : "text",
             value: String(value ?? ""),
             disabled: disabledBase,
+            readOnly: submitted,
             style: inputStyle,
             onChange: (e) => setField(field, node.type === "number" ? Number(e.target.value) : e.target.value)
           }
         ),
-        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
       ] });
     case "textarea":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-        node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: labelStyle, children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+        node.label && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
           node.label,
-          required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+          required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           "textarea",
           {
             value: String(value ?? ""),
             disabled: disabledBase,
+            readOnly: submitted,
             rows: node.props?.rows ?? node.props?.Lines ?? 3,
             style: inputStyle,
             onChange: (e) => setField(field, e.target.value)
           }
         ),
-        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
       ] });
     case "select":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-        node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: labelStyle, children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+        node.label && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
           node.label,
-          required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+          required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { value: String(value ?? ""), disabled: disabledBase, style: inputStyle, onChange: (e) => setField(field, e.target.value), children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "\u8BF7\u9009\u62E9" }),
-          itemsOf(node).map((it, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: it.value, disabled: it.disabled, children: it.label }, i))
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { value: String(value ?? ""), disabled: disabledBase || submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value), children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "", children: "\u8BF7\u9009\u62E9" }),
+          itemsOf(node).map((it, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: it.value, disabled: it.disabled, children: it.label }, i))
         ] }),
-        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
       ] });
     case "date":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-        node.label && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: labelStyle, children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+        node.label && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
           node.label,
-          required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+          required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "date", value: String(value ?? ""), disabled: disabledBase, style: inputStyle, onChange: (e) => setField(field, e.target.value) }),
-        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "date", value: String(value ?? ""), disabled: disabledBase, readOnly: submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value) }),
+        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
       ] });
     case "switch":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: baseStyle, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase ? "not-allowed" : "pointer" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: baseStyle, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase || submitted ? "not-allowed" : "pointer" }, "data-kb-field": node.fieldName, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
             "input",
             {
               type: "checkbox",
               checked: value === true || value === "true" || value === 1,
-              disabled: disabledBase,
+              disabled: disabledBase || submitted,
               onChange: (e) => setField(field, e.target.checked)
             }
           ),
           node.label,
-          required && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { color: "#c62828" }, children: " *" })
+          required && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#c62828" }, children: " *" })
         ] }),
-        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: errorStyle, children: e }, i)),
-        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: helpStyle, children: node.helpText })
+        errors.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: errorStyle, children: e }, i)),
+        node.helpText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: helpStyle, children: node.helpText })
       ] });
     default:
       return null;
   }
 }
 function ButtonView({ node, store, onEvent }) {
-  const disabled = evalDslExpr(node.disabledIf, store) === true;
+  const submitted = store.get("__cjdsl_submitted") === true;
+  const disabled = evalDslExpr(node.disabledIf, store) === true || submitted;
+  const label = submitted && node.type !== "iconButton" ? "\u5DF2\u63D0\u4EA4" : node.label ?? "";
   const variant = node.props?.variant ?? node.props?.Variant ?? "text";
   const color = node.props?.color ?? node.props?.Color ?? "default";
   const colorMap = {
@@ -859,17 +1051,17 @@ function ButtonView({ node, store, onEvent }) {
   const href = node.props?.href;
   const common = { style, disabled, "data-cjdsl-id": node.id };
   if (href && isSafeLink(href)) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: String(href), ...common, children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : node.label ?? "" });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { href: String(href), ...common, children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : label });
   }
   if (clickEv) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { ...common, onClick: () => void onEvent(clickEv), children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : node.label ?? "" });
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { ...common, onClick: () => void onEvent(clickEv), children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : label });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { ...common, onClick: () => void onEvent({ type: "click", handler: "showToast", params: { message: "\u6309\u94AE\u672A\u914D\u7F6E\u4E8B\u4EF6", severity: "warning" } }), children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : node.label ?? "" });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { ...common, onClick: () => void onEvent({ type: "click", handler: "showToast", params: { message: "\u6309\u94AE\u672A\u914D\u7F6E\u4E8B\u4EF6", severity: "warning" } }), children: node.type === "iconButton" ? node.props?.icon ?? "\u26A1" : label });
 }
 function ChartView({ node }) {
   const chartType = node.props?.ChartType ?? node.props?.chartType ?? "donut";
   if (chartType !== "pie" && chartType !== "donut") {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { color: "#888", fontSize: 12, padding: 6 }, children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { color: "#888", fontSize: 12, padding: 6 }, children: [
       "chart v1 \u4EC5\u652F\u6301 Pie/Donut\uFF08\u5F53\u524D ",
       String(chartType),
       "\uFF09"
@@ -887,7 +1079,20 @@ function ChartView({ node }) {
   const width = Number(node.props?.width ?? node.props?.Width ?? 300);
   const height = Number(node.props?.height ?? node.props?.Height ?? 300);
   const svg = buildDonutSvg(data, width, height, chartType === "donut");
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { display: "flex", justifyContent: "center", margin: "10px 0" }, dangerouslySetInnerHTML: { __html: svg } });
+  console.info("[cjdsl-page][ChartView]", {
+    chartType,
+    propsKeys: Object.keys(node.props ?? {}),
+    rawLen: raw.length,
+    firstRaw: raw[0],
+    dataLen: data.length,
+    firstData: data[0],
+    total: data.reduce((s, d) => s + (Number(d.value) || 0), 0),
+    width,
+    height,
+    svgLen: svg.length,
+    svgHead: svg.slice(0, 120)
+  });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { display: "flex", justifyContent: "center", margin: "10px 0" }, dangerouslySetInnerHTML: { __html: svg } });
 }
 
 // src/store.ts
@@ -1111,8 +1316,8 @@ var HttpCjdslApiClient = class {
 var defaultApiClient = new HttpCjdslApiClient();
 
 // src/ChatDslNode.tsx
-var import_react2 = require("react");
-var import_jsx_runtime2 = require("react/jsx-runtime");
+var import_react3 = require("react");
+var import_jsx_runtime3 = require("react/jsx-runtime");
 function stableStringify(value) {
   const normalize = (v) => {
     if (Array.isArray(v)) return v.map(normalize);
@@ -1195,8 +1400,8 @@ function hideAdjacentDslSources(cardEl, targets) {
 function ChatDslNode(props) {
   const data = props.node?.data ?? props.data ?? {};
   const api = props.api;
-  const [toast, setToast] = (0, import_react2.useState)(null);
-  const dslNode = (0, import_react2.useMemo)(() => {
+  const [toast, setToast] = (0, import_react3.useState)(null);
+  const dslNode = (0, import_react3.useMemo)(() => {
     if (data.dsl !== void 0 && data.dsl !== null) return toDslNode(data.dsl);
     if (typeof data.rawText === "string" && data.rawText.trim() !== "") {
       const det = detectDslPayloadInText(data.rawText);
@@ -1204,10 +1409,10 @@ function ChatDslNode(props) {
     }
     return null;
   }, [data.dsl, data.rawText]);
-  const storeRef = (0, import_react2.useMemo)(() => new DslStore(), []);
+  const storeRef = (0, import_react3.useMemo)(() => new DslStore(), []);
   const mode = data.mode ?? "card";
-  const cardRef = (0, import_react2.useRef)(null);
-  const hideTargets = (0, import_react2.useMemo)(() => {
+  const cardRef = (0, import_react3.useRef)(null);
+  const hideTargets = (0, import_react3.useMemo)(() => {
     const set = /* @__PURE__ */ new Set();
     const add = (v) => {
       if (!v || typeof v !== "object") return;
@@ -1223,7 +1428,7 @@ function ChatDslNode(props) {
     }
     return set;
   }, [data.dsl, data.payload, data.rawText, dslNode]);
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     const el = cardRef.current;
     if (!dslNode || !el || hideTargets.size === 0) return;
     let timer = null;
@@ -1247,19 +1452,19 @@ function ChatDslNode(props) {
   };
   if (!dslNode) {
     const hasRaw = data.dsl !== void 0 && data.dsl !== null;
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { border: "1px dashed #e0c46a", borderRadius: 8, padding: "10px 12px", background: "#FFFDE7", fontSize: 13, color: "#8a6d00" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("b", { children: "CJDSL" }),
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { border: "1px dashed #e0c46a", borderRadius: 8, padding: "10px 12px", background: "#FFFDE7", fontSize: 13, color: "#8a6d00" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("b", { children: "CJDSL" }),
       "\uFF1A",
       hasRaw ? "\u68C0\u6D4B\u5230 DSL \u8F7D\u8377\u4F46\u89E3\u6790\u5931\u8D25\uFF0C\u5DF2\u4FDD\u7559\u539F\u6587\u3002" : "\u672A\u68C0\u6D4B\u5230\u53EF\u6E32\u67D3\u7684 DSL \u8F7D\u8377\u3002"
     ] });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { "data-cjdsl-chat-node": "true", ref: cardRef, style: { border: "1px solid rgba(0,0,0,0.12)", borderRadius: 10, overflow: "hidden", margin: "4px 0", background: "#fff" }, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "#F5F7FA", borderBottom: "1px solid rgba(0,0,0,0.08)", fontSize: 12, color: "#666" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontWeight: 600, color: "#1976D2" }, children: "CJDSL" }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { background: "#E3F2FD", color: "#1565C0", borderRadius: 10, padding: "0 8px" }, children: mode }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#999" }, children: "\u5168\u5C40\u6E32\u67D3" })
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { "data-cjdsl-chat-node": "true", ref: cardRef, style: { border: "1px solid rgba(0,0,0,0.12)", borderRadius: 10, overflow: "hidden", margin: "4px 0", background: "#fff" }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "#F5F7FA", borderBottom: "1px solid rgba(0,0,0,0.08)", fontSize: 12, color: "#666" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { fontWeight: 600, color: "#1976D2" }, children: "CJDSL" }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { background: "#E3F2FD", color: "#1565C0", borderRadius: 10, padding: "0 8px" }, children: mode }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { color: "#999" }, children: "\u5168\u5C40\u6E32\u67D3" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { padding: 10 }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { padding: 10 }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       DslRenderer,
       {
         root: dslNode,
@@ -1284,16 +1489,16 @@ function ChatDslNode(props) {
         }
       }
     ) }),
-    toast && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { padding: "6px 12px", fontSize: 12, color: toast.severity === "error" ? "#C62828" : toast.severity === "success" ? "#2E7D32" : "#0277BD", background: toast.severity === "error" ? "#FFEBEE" : toast.severity === "success" ? "#E8F5E9" : "#E1F5FE", borderTop: "1px solid rgba(0,0,0,0.06)" }, children: toast.message })
+    toast && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { padding: "6px 12px", fontSize: 12, color: toast.severity === "error" ? "#C62828" : toast.severity === "success" ? "#2E7D32" : "#0277BD", background: toast.severity === "error" ? "#FFEBEE" : toast.severity === "success" ? "#E8F5E9" : "#E1F5FE", borderTop: "1px solid rgba(0,0,0,0.06)" }, children: toast.message })
   ] });
 }
 
 // src/ToolCard.tsx
-var import_react3 = require("react");
-var import_jsx_runtime3 = require("react/jsx-runtime");
+var import_react4 = require("react");
+var import_jsx_runtime4 = require("react/jsx-runtime");
 function CjdslToolCard(props) {
   const { owner, api = defaultApiClient } = props;
-  const payload = (0, import_react3.useMemo)(() => {
+  const payload = (0, import_react4.useMemo)(() => {
     const block = props.block ?? owner?.block ?? owner;
     const content = block?.content;
     if (Array.isArray(content)) {
@@ -1313,32 +1518,32 @@ function CjdslToolCard(props) {
     }
     return null;
   }, [owner, props.block]);
-  const [toast, setToast] = (0, import_react3.useState)(null);
-  const dslNode = (0, import_react3.useMemo)(() => payload && payload.ok ? toDslNode(payload.render?.dsl) : null, [payload]);
-  const storeRef = (0, import_react3.useMemo)(() => new DslStore(), []);
+  const [toast, setToast] = (0, import_react4.useState)(null);
+  const dslNode = (0, import_react4.useMemo)(() => payload && payload.ok ? toDslNode(payload.render?.dsl) : null, [payload]);
+  const storeRef = (0, import_react4.useMemo)(() => new DslStore(), []);
   const showToast = (message, severity = "info") => {
     setToast({ message, severity });
     setTimeout(() => setToast(null), 3500);
   };
   if (!payload) return null;
   if (!payload.ok) {
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { border: "1px dashed #e0c46a", borderRadius: 8, padding: "10px 12px", background: "#FFFDE7", fontSize: 13, color: "#8a6d00" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("b", { children: "CJDSL" }),
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { border: "1px dashed #e0c46a", borderRadius: 8, padding: "10px 12px", background: "#FFFDE7", fontSize: 13, color: "#8a6d00" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: "CJDSL" }),
       "\uFF1A",
       String(payload.message ?? "\u6E32\u67D3\u5931\u8D25")
     ] });
   }
   if (!dslNode) {
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { border: "1px dashed #ef9a9a", borderRadius: 8, padding: "10px 12px", color: "#c62828", fontSize: 13 }, children: "render.dsl \u89E3\u6790\u5931\u8D25\u6216\u4E3A\u7A7A" });
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { border: "1px dashed #ef9a9a", borderRadius: 8, padding: "10px 12px", color: "#c62828", fontSize: 13 }, children: "render.dsl \u89E3\u6790\u5931\u8D25\u6216\u4E3A\u7A7A" });
   }
   const mode = payload.render?.mode ?? "card";
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { border: "1px solid rgba(0,0,0,0.12)", borderRadius: 10, overflow: "hidden", margin: "4px 0", background: "#fff" }, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "#F5F7FA", borderBottom: "1px solid rgba(0,0,0,0.08)", fontSize: 12, color: "#666" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { fontWeight: 600, color: "#1976D2" }, children: "CJDSL" }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { background: "#E3F2FD", color: "#1565C0", borderRadius: 10, padding: "0 8px" }, children: mode }),
-      payload.generated && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { background: "#F3E5F5", color: "#7B1FA2", borderRadius: 10, padding: "0 8px" }, children: "intent \u751F\u6210" })
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { border: "1px solid rgba(0,0,0,0.12)", borderRadius: 10, overflow: "hidden", margin: "4px 0", background: "#fff" }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "#F5F7FA", borderBottom: "1px solid rgba(0,0,0,0.08)", fontSize: 12, color: "#666" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { fontWeight: 600, color: "#1976D2" }, children: "CJDSL" }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { background: "#E3F2FD", color: "#1565C0", borderRadius: 10, padding: "0 8px" }, children: mode }),
+      payload.generated && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { background: "#F3E5F5", color: "#7B1FA2", borderRadius: 10, padding: "0 8px" }, children: "intent \u751F\u6210" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { padding: 10 }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { padding: 10 }, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
       DslRenderer,
       {
         root: dslNode,
@@ -1362,12 +1567,12 @@ function CjdslToolCard(props) {
         }
       }
     ) }),
-    toast && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { padding: "6px 12px", fontSize: 12, color: toast.severity === "error" ? "#C62828" : toast.severity === "success" ? "#2E7D32" : "#0277BD", background: toast.severity === "error" ? "#FFEBEE" : toast.severity === "success" ? "#E8F5E9" : "#E1F5FE", borderTop: "1px solid rgba(0,0,0,0.06)" }, children: toast.message })
+    toast && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { padding: "6px 12px", fontSize: 12, color: toast.severity === "error" ? "#C62828" : toast.severity === "success" ? "#2E7D32" : "#0277BD", background: toast.severity === "error" ? "#FFEBEE" : toast.severity === "success" ? "#E8F5E9" : "#E1F5FE", borderTop: "1px solid rgba(0,0,0,0.06)" }, children: toast.message })
   ] });
 }
 
 // src/client-entry.tsx
-var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_jsx_runtime5 = require("react/jsx-runtime");
 var inject = ["slots", "locale", "conversationEvents"];
 var cjdslPayloadDefinition = {
   kind: "cjdsl",
@@ -1426,7 +1631,7 @@ function apply(ctx) {
       "conversation.chat.node",
       () => slots.register(
         { name: "conversation.chat.node", key: "cjdsl", id: "cjdsl", label: "CJDSL" },
-        (props) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ChatDslNode, { ...props, api: defaultApiClient })
+        (props) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ChatDslNode, { ...props, api: defaultApiClient })
       )
     );
     const ce = ctx.conversationEvents;

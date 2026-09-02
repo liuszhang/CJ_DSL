@@ -9,12 +9,16 @@ export const V1_COMPONENT_TYPES = new Set([
   "card", "grid", "stack", "divider", "form",
   // 展示
   "textDisplay", "table", "alert", "chip", "badge",
+  // 内联 DSL 引用（决策 7：渲染时 parseDslText → validateDsl → 递归子界面）
+  "dslRef",
   // 表单
   "text", "number", "select", "textarea", "date", "switch",
   // 交互
   "button", "iconButton",
   // 图表
   "chart",
+  // 溯源路径 flow
+  "flow",
 ]);
 
 export const V1_EVENT_HANDLERS = new Set([

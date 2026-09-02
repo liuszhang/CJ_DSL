@@ -15,6 +15,8 @@ export interface CjdslContext {
 /**
  * cjdsl-action CustomEvent 的 detail 结构。
  * type 复用 DSL 事件 9 种 handler 语义（submit/apiCall/navigate/refresh/setvalue/export/toast/showToast/...）。
+ * flow 渲染器额外上抛 type=flowNodeClick（节点点击，highlightOnClick=true 且未配置 navigate 类事件时触发），
+ * 参数固定四元组：nodeId / hop / instanceId / relation。
  */
 export interface CjdslActionDetail {
   /** 事件类型：submit | apiCall | navigate | toast | refresh | setValue | export | ... */

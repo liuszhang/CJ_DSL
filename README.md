@@ -498,7 +498,28 @@ LLM 生成的原始 DSL 经过：
 `card` · `form` · `grid` · `stack` · `paper` · `divider` · `tabs` · `stepper` · `expansion` · `expansionPanel`
 
 ### 展示组件
-`textDisplay` · `table` · `chip` · `badge` · `avatar` · `progress` · `skeleton` · `tooltip` · `pagination` · `alert` · `list` · `listItem` · `chart`
+`textDisplay` · `table` · `chip` · `badge` · `avatar` · `progress` · `skeleton` · `tooltip` · `pagination` · `alert` · `list` · `listItem` · `chart` · `flow`
+
+### 溯源路径 flow（三端）
+
+`type="flow"` 将溯源路径（PathJson）渲染为结构化有向链图：nodes/edges 逐跳展示、eliminated 已排除候选灰化虚线分组、节点卡片含 type 徽标 / note（截断 ≤30 字）/ 证据强度与路径置信度百分比色阶（≥0.7 绿 / 0.4-0.7 橙 / <0.4 红）。
+
+- **Blazor**：`Models/FlowModels.cs`（FlowNode/FlowEdge/FlowEliminatedBranch）+ `Components/Renderers/FlowRenderer.cs`（ComponentType="flow"）
+- **React**：`src/flow.ts`（FlowNode/FlowEdge/FlowEliminatedBranch/FlowProps + FLOW_LAYOUTS）+ `src/flow.tsx`（FlowView，DslRenderer.tsx switch 已注册 case "flow"）
+- **WebComponent**：复用 React FlowView，无需独立实现；`highlightOnClick=true` 且未配置 navigate 类事件时，节点点击上抛 `cjdsl-action` CustomEvent：
+
+```json
+{
+  "type": "flowNodeClick",
+  "action": "flowNodeClick",
+  "nodeId": "hop-0",
+  "hop": 0,
+  "instanceId": "a1b2c3d4-...",
+  "relation": "evidence_of"
+}
+```
+
+宿主监听 `cjdsl-action`（type=flowNodeClick）可接管跳转 / 图谱联动；`applyResult({ setValues })` 可回填联动字段。
 
 ### 交互组件
 `button` · `iconButton`

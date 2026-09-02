@@ -11,6 +11,8 @@ import { evalDslExpr } from "./expr";
 import { validateField, type ValidationRule } from "./validate";
 import { EventDispatcher, type DslEvent, type EventCallbacks, type FormValues, type SubmitContext } from "./events";
 import { buildDonutSvg } from "./svg";
+import { FlowView } from "./flow.tsx";
+import { parseDslText, validateDsl } from "./dsl";
 
 // ── 类型 ────────────────────────────────────────────────────────────
 export interface DslNode {
@@ -256,6 +258,7 @@ function DslNodeView({ node, store, values, validationErrors, setField, onEvent 
           values={values}
           validationErrors={validationErrors}
           setField={setField}
+          onEvent={onEvent}
         />
       );
     case "button":
@@ -263,6 +266,39 @@ function DslNodeView({ node, store, values, validationErrors, setField, onEvent 
       return <ButtonView node={node} store={store} onEvent={onEvent} />;
     case "chart":
       return <ChartView node={node} />;
+    case "flow":
+      return <FlowView node={node} store={store} onEvent={onEvent} />;
+    case "dslRef": {
+      // 决策 7：内联 DSL 引用——props.dsl 持原始 DSL 文本/JSON 字符串，
+      // 渲染时 parseDslText → validateDsl（安全闸门，FORBIDDEN_PROPS / 表达式）→ 递归子界面。
+      const raw = String(node.props?.dsl ?? "");
+      const parsed = parseDslText(raw);
+      if (!parsed.ok || parsed.dsl == null) {
+        return (
+          <div style={{ color: "#c62828", fontSize: 12, padding: "6px 10px", border: "1px dashed #ef9a9a", borderRadius: 4 }}>
+            dslRef 解析失败：{escAttr((parsed.errors ?? []).join("；"))}
+          </div>
+        );
+      }
+      const verr = validateDsl(parsed.dsl);
+      if (!verr.ok) {
+        return (
+          <div style={{ color: "#c62828", fontSize: 12, padding: "6px 10px", border: "1px dashed #ef9a9a", borderRadius: 4 }}>
+            dslRef 校验未通过：{escAttr((verr.errors ?? []).join("；"))}
+          </div>
+        );
+      }
+      return (
+        <DslNodeView
+          node={parsed.dsl as any}
+          store={store}
+          values={values}
+          validationErrors={validationErrors}
+          setField={setField}
+          onEvent={onEvent}
+        />
+      );
+    }
     default:
       return (
         <div style={{ color: "#c62828", fontSize: 12, padding: "6px 10px", border: "1px dashed #ef9a9a", borderRadius: 4 }}>

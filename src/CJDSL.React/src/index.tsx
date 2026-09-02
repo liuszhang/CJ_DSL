@@ -2,6 +2,9 @@
 //   导出 DSL 渲染器、store、事件、表达式、校验、SVG、载荷检测与后端抽象，
 //   供宿主（如 DA.DSH.PA 的 DSH 插件）直接引用，避免本地重复维护渲染器副本。
 export { DslRenderer, type DslNode, type RendererCallbacks } from "./DslRenderer";
+export { FlowView, default as FlowViewDefault } from "./flow.tsx";
+export type { FlowNode, FlowEdge, FlowEliminatedBranch, FlowProps } from "./flow";
+export { FLOW_LAYOUTS } from "./flow";
 export { DslStore } from "./store";
 export { EventDispatcher, type DslEvent, type EventCallbacks, type FormValues, type SubmitContext } from "./events";
 export { evalDslExpr } from "./expr";

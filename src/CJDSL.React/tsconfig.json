@@ -9,7 +9,13 @@
     "skipLibCheck": true,
     "declaration": true,
     "outDir": "lib",
-    "rootDir": "src"
+    "rootDir": "src",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@cj/cjdsl-react": ["src/index.tsx"]
+    }
   },
   "include": ["src"]
 }

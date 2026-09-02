@@ -18,6 +18,7 @@ public static class DslRendererRegistryExtensions
             registry.Register(new StackRenderer());
             registry.Register(new SelectRenderer());
             registry.Register(new DividerRenderer());
+            registry.Register(new FlowRenderer());
 
             return registry;
         });

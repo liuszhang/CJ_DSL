@@ -1,0 +1,250 @@
+@using System.Text.Json
+@using CJDSL.Blazor.Models
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+<MudStack Spacing="2">
+    @if (!string.IsNullOrEmpty(Component.Label))
+    {
+        <MudText Typo="Typo.h6" Class="mb-1">@Component.Label</MudText>
+    }
+
+    @if (_nodes.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">无溯源路径数据</MudAlert>
+    }
+    else
+    {
+        <div style="@(IsVertical ? "display:flex;flex-direction:column;align-items:stretch;gap:12px;" : "display:flex;flex-direction:row;align-items:stretch;gap:4px;overflow-x:auto;padding:4px;")">
+            @for (var i = 0; i < _nodes.Count; i++)
+            {
+                var node = _nodes[i];
+                <div style="display:flex;flex-direction:@(IsVertical ? "column" : "row");align-items:center;gap:8px;flex:0 0 auto;">
+                    <MudPaper Outlined="true"
+                              Elevation="@(IsSelected(node) ? 8 : 1)"
+                              Class="@(IsSelected(node) ? "flow-node flow-node-selected" : "flow-node")"
+                              Style="@GetNodeStyle(node)"
+                              @onclick="() => OnNodeClick(node)">
+                        <MudStack Spacing="1" Class="pa-2" Style="min-width:170px;max-width:230px;">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="1">
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600;word-break:break-all;">@node.Node</MudText>
+                                @if (!string.IsNullOrEmpty(node.Type))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@node.Type</MudChip>
+                                }
+                            </MudStack>
+                            @if (!string.IsNullOrEmpty(GetNote(node)))
+                            {
+                                <MudText Typo="Typo.body2" Style="color:#666;font-size:12px;">@GetNote(node)</MudText>
+                            }
+                            <MudStack Row="true" Spacing="1" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.caption" Style="@GetEvidenceStyle(node.EvidenceStrength)">证据 @FormatPercent(node.EvidenceStrength)</MudText>
+                                <MudText Typo="Typo.caption" Style="color:#777;">置信 @FormatPercent(node.PathConfidence)</MudText>
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+
+                    @if (i < _nodes.Count - 1)
+                    {
+                        var edge = _edges.FirstOrDefault(e => string.Equals(e.Source, node.Id, StringComparison.OrdinalIgnoreCase)
+                                                              && string.Equals(e.Target, _nodes[i + 1].Id, StringComparison.OrdinalIgnoreCase));
+                        <div style="display:flex;flex-direction:column;align-items:center;color:#999;font-size:12px;white-space:nowrap;">
+                            <span style="font-size:16px;line-height:1;">→</span>
+                            @if (edge != null && !string.IsNullOrEmpty(edge.Relation))
+                            {
+                                <span style="color:#777;font-size:11px;">@edge.Relation</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (_eliminated.Count > 0)
+    {
+        <MudText Typo="Typo.subtitle2" Class="mt-3">已排除候选</MudText>
+        <MudStack Spacing="1">
+            @foreach (var item in _eliminated)
+            {
+                var linked = _nodes.FirstOrDefault(n => string.Equals(n.Node, item.Candidate, StringComparison.OrdinalIgnoreCase));
+                <MudPaper Outlined="true" Style="border:1px dashed #bbb;background:#fafafa;padding:8px 12px;border-radius:8px;">
+                    <MudStack Spacing="0">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudText Typo="Typo.body2" Style="color:#999;font-weight:600;">@item.Candidate</MudText>
+                            @if (!string.IsNullOrEmpty(item.CandidateType))
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@item.CandidateType</MudChip>
+                            }
+                            @if (item.Strength.HasValue)
+                            {
+                                <MudText Typo="Typo.caption" Style="color:#999;">强度 @FormatPercent(item.Strength)</MudText>
+                            }
+                        </MudStack>
+                        @if (!string.IsNullOrEmpty(item.Reason))
+                        {
+                            <MudText Typo="Typo.body2" Style="color:#aaa;">@item.Reason</MudText>
+                        }
+                        @if (linked != null)
+                        {
+                            <MudText Typo="Typo.caption" Style="color:#999;">虚线关联：@linked.Node（hop-@linked.Hop）</MudText>
+                        }
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudStack>
+    }
+</MudStack>
+
+@code {
+    [Parameter] public DslComponent Component { get; set; } = null!;
+    [Parameter] public DslRenderContext Context { get; set; } = null!;
+
+    private List<FlowNode> _nodes = new();
+    private List<FlowEdge> _edges = new();
+    private List<FlowEliminatedBranch> _eliminated = new();
+    private bool _highlightOnClick;
+    private string _layout = "horizontal";
+    private string? _selectedId;
+
+    protected override void OnParametersSet()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        _nodes = GetProp<List<FlowNode>>("nodes") ?? new List<FlowNode>();
+
+        // 数据兜底：props.nodes 为空时尝试 DataBind 数据源
+        if (_nodes.Count == 0 && Component.DataBind != null)
+        {
+            var bound = Context.DataStore.Get(Component.DataBind);
+            _nodes = TryConvert<List<FlowNode>>(bound) ?? new List<FlowNode>();
+        }
+
+        _edges = GetProp<List<FlowEdge>>("edges") ?? new List<FlowEdge>();
+        _eliminated = GetProp<List<FlowEliminatedBranch>>("eliminated") ?? new List<FlowEliminatedBranch>();
+        _highlightOnClick = GetBoolProp("highlightOnClick");
+        _layout = GetStringProp("layout", "horizontal") ?? "horizontal";
+    }
+
+    private bool IsVertical => string.Equals(_layout, "vertical", StringComparison.OrdinalIgnoreCase);
+    private bool IsInteractive => _highlightOnClick || (Component.Events?.Any(e => e.Type == "onClick") ?? false);
+
+    private bool IsSelected(FlowNode node) => _highlightOnClick && _selectedId == node.Id;
+
+    private string GetNodeStyle(FlowNode node)
+    {
+        var color = GetStrengthColor(node.EvidenceStrength);
+        var border = IsSelected(node)
+            ? $"3px solid {color}"
+            : $"1px solid {GetStrengthColor(node.EvidenceStrength)}";
+        return $"border:{border};border-radius:8px;cursor:{(IsInteractive ? "pointer" : "default")};";
+    }
+
+    private static string GetStrengthColor(double? strength)
+    {
+        if (!strength.HasValue) return "#9e9e9e";
+        return strength.Value >= 0.7 ? "#4caf50" : strength.Value >= 0.4 ? "#ff9800" : "#f44336";
+    }
+
+    private static string GetEvidenceStyle(double? strength)
+        => $"color:{GetStrengthColor(strength)};font-weight:600;";
+
+    private static string FormatPercent(double? value)
+    {
+        return value.HasValue ? $"{value.Value * 100:0}%" : "—";
+    }
+
+    private static string GetNote(FlowNode node)
+    {
+        if (string.IsNullOrEmpty(node.Note)) return string.Empty;
+        return node.Note.Length <= 30 ? node.Note : node.Note[..30] + "…";
+    }
+
+    private async Task OnNodeClick(FlowNode node)
+    {
+        if (_highlightOnClick)
+        {
+            _selectedId = IsSelected(node) ? null : node.Id;
+        }
+
+        if (Context.EventDispatcher == null) return;
+
+        var clickEvents = Component.Events?.Where(e => e.Type == "onClick").ToList() ?? new List<DslEvent>();
+        if (clickEvents.Count > 0)
+        {
+            foreach (var evt in clickEvents)
+            {
+                await Context.EventDispatcher.DispatchAsync(MergeNodeParams(evt, node), Component, Context);
+            }
+        }
+        else
+        {
+            // 未配置事件时默认 showToast 展示 note
+            var defaultEvt = new DslEvent
+            {
+                Type = "onClick",
+                Handler = "showToast",
+                Params = new Dictionary<string, object>
+                {
+                    ["message"] = string.IsNullOrEmpty(GetNote(node)) ? node.Node : GetNote(node),
+                    ["severity"] = "info"
+                }
+            };
+            await Context.EventDispatcher.DispatchAsync(defaultEvt, Component, Context);
+        }
+    }
+
+    /// <summary>合并固定四元组事件参数：nodeId / hop / instanceId / relation</summary>
+    private DslEvent MergeNodeParams(DslEvent evt, FlowNode node)
+    {
+        var merged = new DslEvent
+        {
+            Type = evt.Type,
+            Handler = evt.Handler,
+            Confirm = evt.Confirm,
+            DebounceMs = evt.DebounceMs,
+            Params = evt.Params == null
+                ? new Dictionary<string, object>()
+                : new Dictionary<string, object>(evt.Params)
+        };
+
+        var relation = _edges.FirstOrDefault(e => string.Equals(e.Source, node.Id, StringComparison.OrdinalIgnoreCase))?.Relation ?? "";
+        merged.Params["nodeId"] = node.Id;
+        merged.Params["hop"] = node.Hop;
+        merged.Params["instanceId"] = node.InstanceId?.ToString() ?? "";
+        merged.Params["relation"] = relation;
+        return merged;
+    }
+
+    private T? GetProp<T>(string key)
+    {
+        if (Component.Props == null || !Component.Props.TryGetValue(key, out var raw) || raw == null) return default;
+        return TryConvert<T>(raw);
+    }
+
+    private static T? TryConvert<T>(object? raw)
+    {
+        if (raw == null) return default;
+        if (raw is T direct) return direct;
+        try
+        {
+            var json = JsonSerializer.Serialize(raw);
+            // 大小写不敏感：flow DSL JSON 字段为 camelCase（node/type/note/evidenceStrength/...），
+            // 需映射到 PascalCase 模型属性（Node/Type/Note/EvidenceStrength/...）。
+            return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch
+        {
+            return default;
+        }
+    }
+
+    private string? GetStringProp(string key, string? defaultValue = null)
+        => Component.Props?.GetValueOrDefault(key) is string v ? v : defaultValue;
+
+    private bool GetBoolProp(string key)
+        => Component.Props?.GetValueOrDefault(key) is bool v && v;
+}
