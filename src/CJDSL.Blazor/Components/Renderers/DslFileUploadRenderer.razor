@@ -106,7 +106,8 @@
 
     private async Task OpenFilePicker()
     {
-        await JSRuntime.InvokeVoidAsync("document.getElementById(_inputId).click()", _inputId);
+        // JSInterop identifier 是点分路径而非任意表达式；须经 eval 包裹，且 _inputId 用 $ 插值进 JS 串
+        await JSRuntime.InvokeVoidAsync("eval", $"document.getElementById('{_inputId}').click()");
     }
 
     private void HandleFileSelected(InputFileChangeEventArgs e)
