@@ -1,6 +1,7 @@
 @using CJDSL.Blazor.Models
 @using Microsoft.JSInterop
 @using MudBlazor
+@using System.Text.Json
 
 <MudStack Class="@GetStringProp("Class")">
     @if (!string.IsNullOrEmpty(Component.Label))
@@ -24,6 +25,14 @@
                     ? GetStringProp("Placeholder", "点击选择文件")
                     : $"{_selectedFiles.Count} 个文件已选择")
             </MudText>
+            @* StoreLocator 模式（链 A 契约：字段值 = Locator 字符串）：无新选文件时回显已有值的尾段文件名 *@
+            @if (UseLocator && (_selectedFiles == null || _selectedFiles.Count == 0)
+                && !string.IsNullOrEmpty(ExistingLocator))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Primary">
+                    已有文件：@ShortenLocator(ExistingLocator!)
+                </MudText>
+            }
             @if (!string.IsNullOrEmpty(GetStringProp("Hint")))
             {
                 <MudText Typo="Typo.caption" Color="Color.Default">
@@ -86,6 +95,14 @@
     private readonly string _inputId = $"file_{Guid.NewGuid():N}";
     private List<IBrowserFile>? _selectedFiles;
     private bool _uploading;
+    /// <summary>本次会话上传得到的 Locator（成功后写入，优先于 props.value 回显）。</summary>
+    private string? _currentLocator;
+
+    /// <summary>StoreLocator 模式开关：由转换器下发，不设 = 旧行为（元数据数组）完全不变。</summary>
+    private bool UseLocator => GetBoolProp("StoreLocator");
+
+    /// <summary>已有值：优先本次会话上传结果，其次 props.value（编辑/重渲染回显）。</summary>
+    private string? ExistingLocator => _currentLocator ?? GetStringProp("value");
 
     private async Task OpenFilePicker()
     {
@@ -156,6 +173,8 @@
         {
             var endpoint = GetStringProp("UploadEndpoint", "/api/upload");
             var maxFileSize = (long)GetIntProp("MaxFileSize", 10485760);
+            var useLocator = UseLocator;
+            var locators = new List<string>();
 
             foreach (var file in _selectedFiles)
             {
@@ -167,15 +186,33 @@
 
                 var response = await HttpClient.PostAsync(endpoint, content);
                 if (response.IsSuccessStatusCode)
+                {
                     Snackbar.Add($"{file.Name} 上传成功", Severity.Success);
+                    // StoreLocator 模式：解析响应体里的 Locator（链 A 契约 = 字段值存 Locator 字符串）
+                    if (useLocator)
+                        locators.Add(await TryExtractLocatorAsync(response));
+                }
                 else
+                {
                     Snackbar.Add($"{file.Name} 上传失败", Severity.Error);
+                }
             }
 
             if (Component.FieldName != null)
             {
-                Context.DataStore.Set($"data.{Component.FieldName}",
-                    _selectedFiles.Select(f => new { f.Name, f.Size, f.ContentType }).ToList());
+                if (useLocator && locators.Count > 0)
+                {
+                    // 链 A 契约为单文件（MaximumFileCount=1）；多文件兜底逗号拼接，不丢数据
+                    var stored = locators.Count == 1 ? locators[0] : string.Join(",", locators);
+                    _currentLocator = stored;
+                    Context.DataStore.Set($"data.{Component.FieldName}", stored);
+                }
+                else
+                {
+                    // 旧行为（StoreLocator 未启用 / 解析不到 Locator）：存元数据数组，数据不丢
+                    Context.DataStore.Set($"data.{Component.FieldName}",
+                        _selectedFiles.Select(f => new { f.Name, f.Size, f.ContentType }).ToList());
+                }
             }
         }
         catch (Exception ex)
@@ -188,5 +225,60 @@
             _selectedFiles = null;
             StateHasChanged();
         }
+    }
+
+    /// <summary>
+    /// 从上传响应体解析 Locator：优先根级 locator 键，其次 data/Data 容器内 locator（均大小写不敏感）。
+    /// 解析不到返回 null（调用方回退元数据数组，不丢数据）。
+    /// </summary>
+    private static async Task<string?> TryExtractLocatorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(body)) return null;
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return null;
+
+            // ① 根级 locator
+            var direct = TryReadLocator(root);
+            if (direct != null) return direct;
+
+            // ② data / Data 容器内 locator（链 A 回执 { data: { locator } } 形态）
+            foreach (var p in root.EnumerateObject())
+            {
+                if (string.Equals(p.Name, "data", StringComparison.OrdinalIgnoreCase)
+                    && p.Value.ValueKind == JsonValueKind.Object)
+                {
+                    var inner = TryReadLocator(p.Value);
+                    if (inner != null) return inner;
+                }
+            }
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>在对象内大小写不敏感扫描 locator 字符串键。</summary>
+    private static string? TryReadLocator(JsonElement el)
+    {
+        foreach (var p in el.EnumerateObject())
+        {
+            if (string.Equals(p.Name, "locator", StringComparison.OrdinalIgnoreCase)
+                && p.Value.ValueKind == JsonValueKind.String)
+                return p.Value.GetString();
+        }
+        return null;
+    }
+
+    /// <summary>Locator 取尾段文件名显示（按 / 与 \ 分割）。</summary>
+    private static string ShortenLocator(string locator)
+    {
+        var idx = locator.LastIndexOfAny(['/', '\\']);
+        return idx >= 0 && idx < locator.Length - 1 ? locator[(idx + 1)..] : locator;
     }
 }

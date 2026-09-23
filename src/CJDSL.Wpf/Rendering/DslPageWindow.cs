@@ -5,7 +5,7 @@ using CJDSL.Domain.Entities.Dsl;
 namespace CJDSL.Wpf.Rendering;
 
 /// <summary>
-/// 基于 DslPage 的 WPF 弹窗 — 类似 ABWork 的 DynamicDialogService，但使用 CJDSL 完整模型
+/// 基于 DslPage 的 WPF 弹窗 — 类似 CJWork 的 DynamicDialogService，但使用 CJDSL 完整模型
 /// </summary>
 public class DslPageWindow
 {

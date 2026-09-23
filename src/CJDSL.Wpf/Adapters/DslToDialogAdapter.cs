@@ -3,7 +3,7 @@ using CJDSL.Domain.Entities.Dsl;
 namespace CJDSL.Wpf.Adapters;
 
 /// <summary>
-/// 将 CJDSL DslPage 转换为简化的 DialogDefinition（兼容 ABWork 的 DynamicDialogService）
+/// 将 CJDSL DslPage 转换为简化的 DialogDefinition（兼容 CJWork 的 DynamicDialogService）
 /// </summary>
 public static class DslToDialogAdapter
 {

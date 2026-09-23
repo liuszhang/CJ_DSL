@@ -16,7 +16,7 @@ namespace CJDSL.Generation;
 /// <summary>
 /// CJDSL.Generation 依赖注入扩展。
 /// 集中封装「规则 + LLM + 后处理 + 验证」全部生成能力，委托 CJCore 提供 LLM 传输/结构化输出。
-/// 各产品（CJOEM / CJOntology / ABWork 等）直接引用本库并调用 <see cref="IDslGenerationService"/> 即可本地生成 DSL，
+/// 各产品（CJOEM / CJOntology / CJWork 等）直接引用本库并调用 <see cref="IDslGenerationService"/> 即可本地生成 DSL，
 /// 不再各自 AddCJDSLInfrastructure() 或依赖独立 HTTP 生成服务。
 /// </summary>
 public static class GenerationServiceExtensions

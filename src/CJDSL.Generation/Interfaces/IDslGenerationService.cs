@@ -7,7 +7,7 @@ namespace CJDSL.Generation.Interfaces;
 
 /// <summary>
 /// CJDSL 生成能力高层门面。
-/// 各产品（CJOEM / CJOntology / ABWork / DA.DSH.PA 等）引用 CJDSL.Generation 后，
+/// 各产品（CJOEM / CJOntology / CJWork / DA.DSH.PA 等）引用 CJDSL.Generation 后，
 /// 仅需注入本接口即可在自身进程内本地生成 DSL（规则 + LLM 双路、自动降级、后处理 + 安全清洗），
 /// 不必依赖集中 HTTP 服务，也不必直接派发 MediatR 命令。
 /// </summary>
