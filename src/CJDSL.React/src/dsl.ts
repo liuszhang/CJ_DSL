@@ -12,7 +12,10 @@ export const V1_COMPONENT_TYPES = new Set([
   // 内联 DSL 引用（决策 7：渲染时 parseDslText → validateDsl → 递归子界面）
   "dslRef",
   // 表单
-  "text", "number", "select", "textarea", "date", "switch",
+  // datetime/time/check/file 为对齐 CJDSL.Blazor 渲染器能力域新增（2026-09-16）：
+  // CJOntology FieldsToDslConverter 会产出 datetime（DateTimePicker 控件）、file（FilePicker/DataType=file）、
+  // time（TimePicker）、check（Checkbox），缺任何一个都会在 DSH 聊天里命中 default 分支红框。
+  "text", "number", "select", "textarea", "date", "datetime", "time", "switch", "check", "file",
   // 交互
   "button", "iconButton",
   // 图表

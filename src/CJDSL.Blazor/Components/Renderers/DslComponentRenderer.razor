@@ -113,6 +113,8 @@
                            Class="@GetStringProp("Class")" />
                 break;
 
+            @* check 为 FieldsToDslConverter（Checkbox 控件）实际下发的类型名，与 checkbox 同渲染（2026-09-16 对齐） *@
+            case "check":
             case "checkbox":
                 <MudCheckBox T="bool"
                              @bind-Value="_boolValue"
@@ -429,6 +431,7 @@
                 _timeValue = initial as TimeSpan?;
                 break;
             case "switch":
+            case "check":
             case "checkbox":
                 // 2026-08-05：支持字符串初始值（DSL 预填经 DataStore 注入为 string "true"/"false"）
                 _boolValue = initial is bool b ? b : bool.TryParse(initial.ToString(), out var bv) && bv;

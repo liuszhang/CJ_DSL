@@ -250,7 +250,11 @@ function DslNodeView({ node, store, values, validationErrors, setField, onEvent 
     case "select":
     case "textarea":
     case "date":
+    case "datetime":
+    case "time":
     case "switch":
+    case "check":
+    case "file":
       return (
         <FieldView
           node={node}
@@ -435,6 +439,50 @@ function BadgeView({ node }: { node: DslNode }) {
   );
 }
 
+// ── 表单字段辅助 ────────────────────────────────────────────────────
+/** 任意日期时间形态 → <input type="datetime-local"> 接受的 yyyy-MM-ddTHH:mm（无效输入返回空串交给浏览器占位）。 */
+function toLocalDateTimeValue(v: unknown): string {
+  if (typeof v !== "string") return "";
+  let s = v.trim();
+  if (!s) return "";
+  // "yyyy/MM/dd ..." → "yyyy-MM-dd ..."
+  if (/^\d{4}\//.test(s)) s = s.replace(/\//g, "-");
+  // 空格分隔 → T 分隔（只换第一个分隔符后的首个空格）
+  s = s.replace(" ", "T");
+  // 去掉时区标记（datetime-local 表达本地时间语义）
+  s = s.replace(/(Z|[+-]\d{2}:\d{2})$/i, "");
+  // 截断到分钟（datetime-local 的完整值；多余的秒/毫秒去掉以保证 value 合法）
+  const m = s.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
+  return m ? m[1] : "";
+}
+
+/** 从上传响应体提取 Locator（对齐 Blazor TryExtractLocator：根级 locator 键 → data/Data 容器内，键大小写不敏感）。 */
+function extractLocator(body: unknown): string | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const scan = (o: Record<string, any>): string | null => {
+    for (const [k, v] of Object.entries(o)) {
+      if (k.toLowerCase() === "locator" && typeof v === "string" && v) return v;
+    }
+    return null;
+  };
+  const rec = body as Record<string, any>;
+  const direct = scan(rec);
+  if (direct) return direct;
+  for (const v of Object.values(rec)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const inner = scan(v as Record<string, any>);
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+
+/** Locator/路径 → 尾段文件名显示（按 / 与 \ 分割）。 */
+function shortLocatorName(v: string): string {
+  const idx = Math.max(v.lastIndexOf("/"), v.lastIndexOf("\\"));
+  return idx >= 0 && idx < v.length - 1 ? v.slice(idx + 1) : v;
+}
+
 // ── 表单字段 ────────────────────────────────────────────────────────
 function FieldView({ node, store, values, validationErrors, setField }: NodeViewProps) {
   const field = node.fieldName;
@@ -444,6 +492,9 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
   // 提交乐观锁：表单已提交（__cjdsl_submitted）后，字段整体只读/禁用，防重复填写
   const submitted = store.get("__cjdsl_submitted") === true;
   const errors = field ? (validationErrors[field] ?? []) : [];
+
+  // file 组件上传态（hooks 必须无条件位于所有 early-return 之前，保持调用顺序稳定）
+  const [upload, setUpload] = useState<{ uploading: boolean; message: string }>({ uploading: false, message: "" });
 
   const baseStyle: React.CSSProperties = {
     display: "flex",
@@ -528,7 +579,29 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
           {node.helpText && <div style={helpStyle}>{node.helpText}</div>}
         </div>
       );
+    // datetime：datetime-local 输入（对齐 Blazor case "datetime"）。值归一到 yyyy-MM-ddTHH:mm，
+    // 兼容后端下发的 "yyyy-MM-dd HH:mm[:ss]" / "yyyy/MM/dd ..." / ISO+Z 等形态；提交按原样回传（后端 DateTime.TryParse 可解析）。
+    case "datetime":
+      return (
+        <div style={baseStyle}>
+          {node.label && <label style={labelStyle} data-kb-field={node.fieldName}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
+          <input type="datetime-local" value={toLocalDateTimeValue(value)} disabled={disabledBase} readOnly={submitted} style={inputStyle} onChange={(e) => setField(field, e.target.value)} />
+          {errors.map((e, i) => <div key={i} style={errorStyle}>{e}</div>)}
+          {node.helpText && <div style={helpStyle}>{node.helpText}</div>}
+        </div>
+      );
+    case "time":
+      return (
+        <div style={baseStyle}>
+          {node.label && <label style={labelStyle} data-kb-field={node.fieldName}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
+          <input type="time" value={String(value ?? "")} disabled={disabledBase} readOnly={submitted} style={inputStyle} onChange={(e) => setField(field, e.target.value)} />
+          {errors.map((e, i) => <div key={i} style={errorStyle}>{e}</div>)}
+          {node.helpText && <div style={helpStyle}>{node.helpText}</div>}
+        </div>
+      );
+    // check（Checkbox 控件经 FieldsToDslConverter 映射的名字）与 switch 同渲染
     case "switch":
+    case "check":
       return (
         <div style={baseStyle}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase || submitted ? "not-allowed" : "pointer" }} data-kb-field={node.fieldName}>
@@ -544,6 +617,76 @@ function FieldView({ node, store, values, validationErrors, setField }: NodeView
           {node.helpText && <div style={helpStyle}>{node.helpText}</div>}
         </div>
       );
+    // file：对齐 Blazor DslFileUploadRenderer 契约 ——
+    //   UploadEndpoint（默认 /api/upload）POST multipart（form field: file）；
+    //   StoreLocator=true（链 A/FieldsToDslConverter 均为 true）→ 字段值 = 响应中的 Locator 字符串；
+    //   否则回退存元数据数组（不丢数据）。回显已有值取尾段文件名。
+    case "file": {
+      const endpoint = String(node.props?.UploadEndpoint ?? node.props?.uploadEndpoint ?? "/api/upload");
+      const useLocator = node.props?.StoreLocator === true || node.props?.storeLocator === true;
+      const busy = upload.uploading || disabledBase || submitted;
+      const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const input = e.target;
+        const f = input.files?.[0];
+        if (!f) return;
+        setUpload({ uploading: true, message: "" });
+        try {
+          const fd = new FormData();
+          fd.append("file", f, f.name);
+          const resp = await fetch(endpoint, { method: "POST", body: fd });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const body = await resp.json().catch(() => null);
+          const locator = extractLocator(body);
+          if (useLocator) {
+            if (!locator) throw new Error("响应缺少 locator");
+            setField(field, locator);
+          } else {
+            // 旧行为（StoreLocator 未启用 / 解析不到 Locator）：存元数据数组，与 Blazor 端一致
+            setField(field, [{ Name: f.name, Size: f.size, ContentType: f.type }]);
+          }
+          setUpload({ uploading: false, message: `${f.name} 上传成功` });
+        } catch (err) {
+          setUpload({ uploading: false, message: `上传失败：${(err as Error).message}` });
+        } finally {
+          input.value = "";
+        }
+      };
+      const existing = value === "" || value === undefined || value === null ? "" : typeof value === "string" ? value : JSON.stringify(value);
+      return (
+        <div style={baseStyle}>
+          {node.label && <label style={labelStyle} data-kb-field={node.fieldName}>{node.label}{required && <span style={{ color: "#c62828" }}> *</span>}</label>}
+          <label
+            data-kb-field={node.fieldName}
+            style={{
+              border: errors.length > 0 ? "1px solid #C62828" : "1px dashed rgba(0,0,0,0.3)",
+              borderRadius: 4,
+              padding: "16px 10px",
+              textAlign: "center",
+              fontSize: 14,
+              cursor: busy ? "not-allowed" : "pointer",
+              background: lockBg,
+              color: upload.uploading ? lockColor : "#666",
+              opacity: busy && !upload.uploading ? 0.6 : 1,
+            }}
+          >
+            {upload.uploading ? "上传中…" : "点击选择文件"}
+            <input
+              type="file"
+              accept={node.props?.Accept ?? node.props?.accept}
+              disabled={busy}
+              style={{ display: "none" }}
+              onChange={(e) => void onFileChange(e)}
+            />
+          </label>
+          {existing && <div style={helpStyle}>已有文件：{shortLocatorName(existing)}</div>}
+          {upload.message && (
+            <div style={upload.message.includes("失败") ? errorStyle : helpStyle}>{upload.message}</div>
+          )}
+          {errors.map((e, i) => <div key={i} style={errorStyle}>{e}</div>)}
+          {node.helpText && <div style={helpStyle}>{node.helpText}</div>}
+        </div>
+      );
+    }
     default:
       return null;
   }

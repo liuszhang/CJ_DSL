@@ -12,7 +12,7 @@ public class DslSemanticValidator : IDslValidator
     private readonly HashSet<string> _renderedComponentTypes = new()
     {
         "page", "card", "form", "text", "number", "select", "autocomplete", "textarea",
-        "date", "datetime", "time", "checkbox", "switch", "radio", "slider", "rating",
+        "date", "datetime", "time", "check", "checkbox", "switch", "radio", "slider", "rating",
         "file", "button", "iconButton",
         "table", "list", "listItem", "tabs", "stepper", "expansion", "expansionPanel",
         "dialog", "snackbar", "progress", "chart", "markdown", "grid", "stack",

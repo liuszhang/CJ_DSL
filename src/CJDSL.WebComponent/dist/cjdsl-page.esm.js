@@ -662,12 +662,19 @@ var V1_COMPONENT_TYPES = /* @__PURE__ */ new Set([
   // 内联 DSL 引用（决策 7：渲染时 parseDslText → validateDsl → 递归子界面）
   "dslRef",
   // 表单
+  // datetime/time/check/file 为对齐 CJDSL.Blazor 渲染器能力域新增（2026-09-16）：
+  // CJOntology FieldsToDslConverter 会产出 datetime（DateTimePicker 控件）、file（FilePicker/DataType=file）、
+  // time（TimePicker）、check（Checkbox），缺任何一个都会在 DSH 聊天里命中 default 分支红框。
   "text",
   "number",
   "select",
   "textarea",
   "date",
+  "datetime",
+  "time",
   "switch",
+  "check",
+  "file",
   // 交互
   "button",
   "iconButton",
@@ -1007,7 +1014,11 @@ function DslNodeView({ node, store, values, validationErrors, setField, onEvent 
     case "select":
     case "textarea":
     case "date":
+    case "datetime":
+    case "time":
     case "switch":
+    case "check":
+    case "file":
       return /* @__PURE__ */ jsx2(
         FieldView,
         {
@@ -1129,6 +1140,39 @@ function BadgeView({ node }) {
   const color = node.props?.color ?? node.props?.Color ?? "#1976D2";
   return /* @__PURE__ */ jsx2("span", { style: { display: "inline-block", background: String(color), color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 11, margin: "0 4px 0 0" }, children: String(node.props?.text ?? node.props?.content ?? node.label ?? "") });
 }
+function toLocalDateTimeValue(v) {
+  if (typeof v !== "string") return "";
+  let s = v.trim();
+  if (!s) return "";
+  if (/^\d{4}\//.test(s)) s = s.replace(/\//g, "-");
+  s = s.replace(" ", "T");
+  s = s.replace(/(Z|[+-]\d{2}:\d{2})$/i, "");
+  const m = s.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
+  return m ? m[1] : "";
+}
+function extractLocator(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const scan = (o) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (k.toLowerCase() === "locator" && typeof v === "string" && v) return v;
+    }
+    return null;
+  };
+  const rec = body;
+  const direct = scan(rec);
+  if (direct) return direct;
+  for (const v of Object.values(rec)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const inner = scan(v);
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+function shortLocatorName(v) {
+  const idx = Math.max(v.lastIndexOf("/"), v.lastIndexOf("\\"));
+  return idx >= 0 && idx < v.length - 1 ? v.slice(idx + 1) : v;
+}
 function FieldView({ node, store, values, validationErrors, setField }) {
   const field = node.fieldName;
   const value = field ? store.get(`data.${field}`) ?? "" : "";
@@ -1136,6 +1180,7 @@ function FieldView({ node, store, values, validationErrors, setField }) {
   const disabledBase = evalDslExpr(node.disabledIf, store) === true;
   const submitted = store.get("__cjdsl_submitted") === true;
   const errors = field ? validationErrors[field] ?? [] : [];
+  const [upload, setUpload] = useState2({ uploading: false, message: "" });
   const baseStyle = {
     display: "flex",
     flexDirection: "column",
@@ -1225,7 +1270,31 @@ function FieldView({ node, store, values, validationErrors, setField }) {
         errors.map((e, i) => /* @__PURE__ */ jsx2("div", { style: errorStyle, children: e }, i)),
         node.helpText && /* @__PURE__ */ jsx2("div", { style: helpStyle, children: node.helpText })
       ] });
+    // datetime：datetime-local 输入（对齐 Blazor case "datetime"）。值归一到 yyyy-MM-ddTHH:mm，
+    // 兼容后端下发的 "yyyy-MM-dd HH:mm[:ss]" / "yyyy/MM/dd ..." / ISO+Z 等形态；提交按原样回传（后端 DateTime.TryParse 可解析）。
+    case "datetime":
+      return /* @__PURE__ */ jsxs2("div", { style: baseStyle, children: [
+        node.label && /* @__PURE__ */ jsxs2("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
+          node.label,
+          required && /* @__PURE__ */ jsx2("span", { style: { color: "#c62828" }, children: " *" })
+        ] }),
+        /* @__PURE__ */ jsx2("input", { type: "datetime-local", value: toLocalDateTimeValue(value), disabled: disabledBase, readOnly: submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value) }),
+        errors.map((e, i) => /* @__PURE__ */ jsx2("div", { style: errorStyle, children: e }, i)),
+        node.helpText && /* @__PURE__ */ jsx2("div", { style: helpStyle, children: node.helpText })
+      ] });
+    case "time":
+      return /* @__PURE__ */ jsxs2("div", { style: baseStyle, children: [
+        node.label && /* @__PURE__ */ jsxs2("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
+          node.label,
+          required && /* @__PURE__ */ jsx2("span", { style: { color: "#c62828" }, children: " *" })
+        ] }),
+        /* @__PURE__ */ jsx2("input", { type: "time", value: String(value ?? ""), disabled: disabledBase, readOnly: submitted, style: inputStyle, onChange: (e) => setField(field, e.target.value) }),
+        errors.map((e, i) => /* @__PURE__ */ jsx2("div", { style: errorStyle, children: e }, i)),
+        node.helpText && /* @__PURE__ */ jsx2("div", { style: helpStyle, children: node.helpText })
+      ] });
+    // check（Checkbox 控件经 FieldsToDslConverter 映射的名字）与 switch 同渲染
     case "switch":
+    case "check":
       return /* @__PURE__ */ jsxs2("div", { style: baseStyle, children: [
         /* @__PURE__ */ jsxs2("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: disabledBase || submitted ? "not-allowed" : "pointer" }, "data-kb-field": node.fieldName, children: [
           /* @__PURE__ */ jsx2(
@@ -1243,6 +1312,84 @@ function FieldView({ node, store, values, validationErrors, setField }) {
         errors.map((e, i) => /* @__PURE__ */ jsx2("div", { style: errorStyle, children: e }, i)),
         node.helpText && /* @__PURE__ */ jsx2("div", { style: helpStyle, children: node.helpText })
       ] });
+    // file：对齐 Blazor DslFileUploadRenderer 契约 ——
+    //   UploadEndpoint（默认 /api/upload）POST multipart（form field: file）；
+    //   StoreLocator=true（链 A/FieldsToDslConverter 均为 true）→ 字段值 = 响应中的 Locator 字符串；
+    //   否则回退存元数据数组（不丢数据）。回显已有值取尾段文件名。
+    case "file": {
+      const endpoint = String(node.props?.UploadEndpoint ?? node.props?.uploadEndpoint ?? "/api/upload");
+      const useLocator = node.props?.StoreLocator === true || node.props?.storeLocator === true;
+      const busy = upload.uploading || disabledBase || submitted;
+      const onFileChange = async (e) => {
+        const input = e.target;
+        const f = input.files?.[0];
+        if (!f) return;
+        setUpload({ uploading: true, message: "" });
+        try {
+          const fd = new FormData();
+          fd.append("file", f, f.name);
+          const resp = await fetch(endpoint, { method: "POST", body: fd });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const body = await resp.json().catch(() => null);
+          const locator = extractLocator(body);
+          if (useLocator) {
+            if (!locator) throw new Error("\u54CD\u5E94\u7F3A\u5C11 locator");
+            setField(field, locator);
+          } else {
+            setField(field, [{ Name: f.name, Size: f.size, ContentType: f.type }]);
+          }
+          setUpload({ uploading: false, message: `${f.name} \u4E0A\u4F20\u6210\u529F` });
+        } catch (err) {
+          setUpload({ uploading: false, message: `\u4E0A\u4F20\u5931\u8D25\uFF1A${err.message}` });
+        } finally {
+          input.value = "";
+        }
+      };
+      const existing = value === "" || value === void 0 || value === null ? "" : typeof value === "string" ? value : JSON.stringify(value);
+      return /* @__PURE__ */ jsxs2("div", { style: baseStyle, children: [
+        node.label && /* @__PURE__ */ jsxs2("label", { style: labelStyle, "data-kb-field": node.fieldName, children: [
+          node.label,
+          required && /* @__PURE__ */ jsx2("span", { style: { color: "#c62828" }, children: " *" })
+        ] }),
+        /* @__PURE__ */ jsxs2(
+          "label",
+          {
+            "data-kb-field": node.fieldName,
+            style: {
+              border: errors.length > 0 ? "1px solid #C62828" : "1px dashed rgba(0,0,0,0.3)",
+              borderRadius: 4,
+              padding: "16px 10px",
+              textAlign: "center",
+              fontSize: 14,
+              cursor: busy ? "not-allowed" : "pointer",
+              background: lockBg,
+              color: upload.uploading ? lockColor : "#666",
+              opacity: busy && !upload.uploading ? 0.6 : 1
+            },
+            children: [
+              upload.uploading ? "\u4E0A\u4F20\u4E2D\u2026" : "\u70B9\u51FB\u9009\u62E9\u6587\u4EF6",
+              /* @__PURE__ */ jsx2(
+                "input",
+                {
+                  type: "file",
+                  accept: node.props?.Accept ?? node.props?.accept,
+                  disabled: busy,
+                  style: { display: "none" },
+                  onChange: (e) => void onFileChange(e)
+                }
+              )
+            ]
+          }
+        ),
+        existing && /* @__PURE__ */ jsxs2("div", { style: helpStyle, children: [
+          "\u5DF2\u6709\u6587\u4EF6\uFF1A",
+          shortLocatorName(existing)
+        ] }),
+        upload.message && /* @__PURE__ */ jsx2("div", { style: upload.message.includes("\u5931\u8D25") ? errorStyle : helpStyle, children: upload.message }),
+        errors.map((e, i) => /* @__PURE__ */ jsx2("div", { style: errorStyle, children: e }, i)),
+        node.helpText && /* @__PURE__ */ jsx2("div", { style: helpStyle, children: node.helpText })
+      ] });
+    }
     default:
       return null;
   }
